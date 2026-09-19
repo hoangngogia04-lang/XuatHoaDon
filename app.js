@@ -317,7 +317,7 @@ function debouncedUpdateEasyInvoiceSummary() {
     }, 150);
 }
 
-    if (fetchBtn) fetchBtn.addEventListener('click', handleFetchData);
+    if (fetchBtn) fetchBtn.addEventListener('click', () => handleFetchData(true));
     if (searchInput) searchInput.addEventListener('input', applyFilters);
     if (statusFilter) statusFilter.addEventListener('change', applyFilters);
 
@@ -355,8 +355,34 @@ function debouncedUpdateEasyInvoiceSummary() {
     }
 }
 
-// Fetch Orders / Sales from PosApp Proxy API
-async function handleFetchData() {
+// In-memory Session Cache for instant branch switching
+const posAppSessionCache = new Map();
+
+function resetKpiStatsToLoading() {
+    const totalOrdersEl = document.getElementById('stat-total-orders');
+    if (totalOrdersEl) totalOrdersEl.innerText = '...';
+
+    const totalCupsEl = document.getElementById('stat-total-cups');
+    if (totalCupsEl) totalCupsEl.innerText = '...';
+
+    const cupsBreakdownEl = document.getElementById('stat-cups-breakdown');
+    if (cupsBreakdownEl) cupsBreakdownEl.innerText = 'Đang tải dữ liệu từ PosApp...';
+
+    const totalRevEl = document.getElementById('stat-total-revenue');
+    if (totalRevEl) totalRevEl.innerText = '...';
+
+    const avgOrderEl = document.getElementById('stat-avg-order');
+    if (avgOrderEl) avgOrderEl.innerText = '...';
+
+    const toppingsEl = document.getElementById('stat-toppings-total');
+    if (toppingsEl) toppingsEl.innerText = 'Đang lấy báo cáo...';
+
+    const summarySection = document.getElementById('easyinvoice-summary-section');
+    if (summarySection) summarySection.classList.add('hidden');
+}
+
+// Fetch Orders / Sales from PosApp Proxy API with Instant Caching & Loading Indicator
+async function handleFetchData(forceRefresh = false) {
     const branchKey = document.getElementById('branch-select').value;
     const dateStr = document.getElementById('date-input').value;
     const fetchBtn = document.getElementById('fetch-btn');
@@ -385,13 +411,27 @@ async function handleFetchData() {
         return;
     }
 
+    const cacheKey = `${shopId}_${dateStr}`;
+
+    // Instant cache load if available and not forced refresh!
+    if (!forceRefresh && posAppSessionCache.has(cacheKey)) {
+        const cachedOrders = posAppSessionCache.get(cacheKey);
+        const totalCups = cachedOrders.reduce((sum, o) => sum + (o.totalCups || 0), 0);
+        const totalAmount = cachedOrders.reduce((sum, o) => sum + (o.finalTotal || 0), 0);
+        loadOrders(cachedOrders, `Đã tải ${cachedOrders.length} đơn hàng từ chi nhánh ${branchName}`);
+        showToast(`Đã chuyển sang chi nhánh ${branchName} thành công!`, "success");
+        return;
+    }
+
+    // Instant visual feedback on UI stat cards!
+    resetKpiStatsToLoading();
+
     fetchBtn.disabled = true;
     const origHtml = fetchBtn.innerHTML;
     fetchBtn.innerHTML = `<i data-lucide="loader-2" class="animate-spin"></i> Đang tải...`;
     lucide.createIcons();
 
     try {
-        // Build base proxy URL (supports both http://localhost:3000 and file://)
         const baseUrl = (window.location.protocol === 'file:') ? 'http://localhost:3000' : '';
         const fetchOrdersUrl = `${baseUrl}/api/posapp?action=fetchOrders&shopId=${shopId}&posAppToken=${token}&date=${dateStr}`;
 
@@ -415,6 +455,9 @@ async function handleFetchData() {
             }
 
             if (parsedOrders && parsedOrders.length > 0) {
+                // Store in session cache
+                posAppSessionCache.set(cacheKey, parsedOrders);
+
                 const totalCups = parsedOrders.reduce((sum, o) => sum + (o.totalCups || 0), 0);
                 const totalAmount = parsedOrders.reduce((sum, o) => sum + (o.finalTotal || 0), 0);
                 loadOrders(parsedOrders, `Đã tải ${parsedOrders.length} đơn hàng (${totalCups} ly - ${totalAmount.toLocaleString('vi-VN')}đ) từ ${branchName}`);
