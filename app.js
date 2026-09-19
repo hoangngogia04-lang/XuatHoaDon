@@ -982,6 +982,7 @@ function updateEasyInvoiceSummary() {
 // Render Orders Table
 function renderOrdersTable() {
     const tbody = document.getElementById('orders-tbody');
+    if (!tbody) return;
     tbody.innerHTML = '';
 
     if (filteredOrders.length === 0) {
