@@ -418,7 +418,11 @@ async function handleFetchData() {
         }
     } catch (err) {
         console.error("Lỗi khi tải PosApp:", err);
-        showToast(`Không kết nối được server Local. Bạn nhớ click đúp chạy file start.bat trước nhé!`, "error");
+        if (window.location.protocol === 'file:') {
+            showToast(`Không kết nối được server Local. Bạn nhớ click đúp chạy file start.bat trước nhé!`, "error");
+        } else {
+            showToast(`Lỗi kết nối máy chủ PosApp (${err.message}). Vui lòng thử lại!`, "error");
+        }
     } finally {
         fetchBtn.disabled = false;
         fetchBtn.innerHTML = origHtml;
