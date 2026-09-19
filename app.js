@@ -308,6 +308,15 @@ function initEventListeners() {
         });
     }
 
+// Debounce helper for smooth typing without lag
+let summaryDebounceTimer = null;
+function debouncedUpdateEasyInvoiceSummary() {
+    if (summaryDebounceTimer) clearTimeout(summaryDebounceTimer);
+    summaryDebounceTimer = setTimeout(() => {
+        updateEasyInvoiceSummary();
+    }, 150);
+}
+
     if (fetchBtn) fetchBtn.addEventListener('click', handleFetchData);
     if (searchInput) searchInput.addEventListener('input', applyFilters);
     if (statusFilter) statusFilter.addEventListener('change', applyFilters);
@@ -322,7 +331,7 @@ function initEventListeners() {
                 } else {
                     e.target.value = '';
                 }
-                updateEasyInvoiceSummary();
+                debouncedUpdateEasyInvoiceSummary();
             });
         }
     });
@@ -332,7 +341,7 @@ function initEventListeners() {
         if (el) {
             el.addEventListener('change', updateEasyInvoiceSummary);
             if (el.tagName === 'INPUT') {
-                el.addEventListener('input', updateEasyInvoiceSummary);
+                el.addEventListener('input', debouncedUpdateEasyInvoiceSummary);
             }
         }
     });
@@ -956,21 +965,21 @@ function updateEasyInvoiceSummary() {
     if (cupsCountEl) cupsCountEl.innerText = `${totalCupsCount} ly`;
     if (revenueEl) revenueEl.innerText = `${actualRevenue.toLocaleString('vi-VN')}đ`;
 
-    pillsContainer.innerHTML = '';
+    let pillsHtml = '';
     hdList.forEach(hd => {
-        const pill = document.createElement('div');
-        pill.className = 'hd-pill-card';
-        pill.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <i data-lucide="file-text" style="color: #60a5fa; width: 18px; height: 18px;"></i>
-                <span style="font-weight: 700; color: #fff; font-size: 15px;">${hd.code}:</span>
-                <span style="color: #10b981; font-weight: 600; font-size: 14px;">${hd.count} dòng</span>
-                <span style="color: #9ca3af; font-size: 14px;">-</span>
-                <strong style="color: #f3f4f6; font-size: 15px;">${hd.total.toLocaleString('vi-VN')}đ</strong>
+        pillsHtml += `
+            <div class="hd-pill-card">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="file-text" style="color: #60a5fa; width: 18px; height: 18px;"></i>
+                    <span style="font-weight: 700; color: #fff; font-size: 15px;">${hd.code}:</span>
+                    <span style="color: #10b981; font-weight: 600; font-size: 14px;">${hd.count} dòng</span>
+                    <span style="color: #9ca3af; font-size: 14px;">-</span>
+                    <strong style="color: #f3f4f6; font-size: 15px;">${hd.total.toLocaleString('vi-VN')}đ</strong>
+                </div>
             </div>
         `;
-        pillsContainer.appendChild(pill);
     });
+    pillsContainer.innerHTML = pillsHtml;
 
     if (metaSpan) {
         metaSpan.innerText = `Tổng ${hdList.length} Hóa Đơn (Tự động cân bằng tiền)`;
