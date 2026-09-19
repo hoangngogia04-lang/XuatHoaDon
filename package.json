@@ -1,0 +1,16 @@
+{
+  "name": "posapp-xuathoadon-web",
+  "version": "1.0.0",
+  "description": "Ứng dụng web tổng hợp hóa đơn PosApp và xuất file Excel EasyInvoice 43 cột cho thương hiệu Trà Sữa Ngô Gia",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "posapp",
+    "easyinvoice",
+    "ngogia"
+  ],
+  "author": "",
+  "license": "ISC"
+}
