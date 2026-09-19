@@ -845,15 +845,10 @@ function parseDeductInput(id) {
     return Math.max(0, parseFloat(valStr) || 0);
 }
 
-// Render EasyInvoice Summary Pills matching user screenshot (HD1: 30 dòng - 1.315.000đ...)
-function updateEasyInvoiceSummary() {
-    const summarySection = document.getElementById('easyinvoice-summary-section');
-    const pillsContainer = document.getElementById('easyinvoice-pills-container');
-    const metaSpan = document.getElementById('easyinvoice-summary-meta');
-
-    if (!summarySection || !pillsContainer || !filteredOrders || filteredOrders.length === 0) {
-        if (summarySection) summarySection.classList.add('hidden');
-        return;
+// Helper to prepare unified EasyInvoice rows and target revenue
+function prepareEasyInvoiceData() {
+    if (!filteredOrders || filteredOrders.length === 0) {
+        return { allItemsList: [], targetExportRevenue: 0, exportRows: [], dateStr: '' };
     }
 
     const groupIdentical = true;
@@ -862,11 +857,20 @@ function updateEasyInvoiceSummary() {
     let allItemsList = [];
     filteredOrders.forEach(order => {
         order.items.forEach(item => {
-            allItemsList.push({ ...item });
+            allItemsList.push({
+                name: item.name,
+                unit: item.unit,
+                qty: Number(item.qty || 0),
+                price: Number(item.price || 0),
+                total: Number(item.total || 0),
+                isTopping: Boolean(item.isTopping),
+                isGift: Boolean(item.isGift)
+            });
         });
     });
 
     if (groupIdentical) {
+        // Group identical items together by (Name + Unit + Price)
         const groupedMap = new Map();
         allItemsList.forEach(item => {
             const key = `${item.name}|${item.unit}|${item.price}`;
@@ -879,6 +883,7 @@ function updateEasyInvoiceSummary() {
             }
         });
         allItemsList = Array.from(groupedMap.values());
+        allItemsList.sort((a, b) => b.qty - a.qty || b.total - a.total);
     }
 
     const totalPosRevenue = filteredOrders.reduce((sum, o) => sum + Number(o.finalTotal || 0), 0);
@@ -888,16 +893,34 @@ function updateEasyInvoiceSummary() {
     const totalDeduction = deductFood + deductGrab + deductOther;
     const targetExportRevenue = Math.max(0, totalPosRevenue - totalDeduction);
 
+    const dateStr = document.getElementById('date-input')?.value || new Date().toISOString().split('T')[0];
+    const numInvVal = document.getElementById('num-invoices-input')?.value;
+    const customNumInvoices = numInvVal ? (parseInt(numInvVal) || 0) : 0;
+    const linesVal = document.getElementById('target-lines-input')?.value;
+    const targetLines = linesVal ? (parseInt(linesVal) || 30) : 30;
+
+    const exportRows = compileEasyInvoiceRecords(allItemsList, dateStr, customNumInvoices, targetLines, targetExportRevenue);
+
+    return { allItemsList, targetExportRevenue, exportRows, dateStr };
+}
+
+// Render EasyInvoice Summary Pills matching user screenshot
+function updateEasyInvoiceSummary() {
+    const summarySection = document.getElementById('easyinvoice-summary-section');
+    const pillsContainer = document.getElementById('easyinvoice-pills-container');
+    const metaSpan = document.getElementById('easyinvoice-summary-meta');
+
+    if (!summarySection || !pillsContainer || !filteredOrders || filteredOrders.length === 0) {
+        if (summarySection) summarySection.classList.add('hidden');
+        return;
+    }
+
+    const { targetExportRevenue, exportRows } = prepareEasyInvoiceData();
+
     const badgeEl = document.getElementById('target-export-revenue-badge');
     if (badgeEl) {
         badgeEl.innerText = `${targetExportRevenue.toLocaleString('vi-VN')}đ`;
     }
-
-    const dateStr = document.getElementById('date-input')?.value || new Date().toISOString().split('T')[0];
-    const customNumInvoices = parseInt(document.getElementById('num-invoices-input')?.value) || 0;
-    const targetLines = parseInt(document.getElementById('target-lines-input')?.value) || 30;
-
-    const exportRows = compileEasyInvoiceRecords(allItemsList, dateStr, customNumInvoices, targetLines, targetExportRevenue);
 
     // Group exportRows by MaHD
     const hdMap = new Map();
@@ -913,7 +936,7 @@ function updateEasyInvoiceSummary() {
 
     const hdList = Array.from(hdMap.values());
 
-    // Update "Thống Kê Phân Bổ Hóa Đơn" 4 KPI cards matching user screenshot (media_1789739093960.png)
+    // Update "Thống Kê Phân Bổ Hóa Đơn" 4 KPI cards
     const hdCount = hdList.length;
     const totalLinesCount = exportRows.length;
     const totalCupsCount = exportRows.reduce((sum, r) => sum + (r.DVT === 'Ly' ? Number(r.SoLuong || 0) : 0), 0);
@@ -1140,14 +1163,35 @@ function compileEasyInvoiceRecords(rawItemsList, dateStr, customNumInvoices = 0,
         let accumulated = 0;
         let selected = [];
         for (const item of validItemsList) {
-            const itemVal = Number(item.total || 0);
-            if (accumulated + itemVal <= targetExportRevenue + 15000) {
-                selected.push(item);
-                accumulated += itemVal;
+            const itemQty = Number(item.qty || 1);
+            const itemPrice = Number(item.price || 0);
+            const itemTotal = Number(item.total || 0);
+
+            if (accumulated + itemTotal <= targetExportRevenue) {
+                selected.push({ ...item });
+                accumulated += itemTotal;
             } else if (accumulated < targetExportRevenue) {
-                if (Math.abs((accumulated + itemVal) - targetExportRevenue) < Math.abs(accumulated - targetExportRevenue)) {
-                    selected.push(item);
-                    accumulated += itemVal;
+                const diffNeeded = targetExportRevenue - accumulated;
+                if (itemPrice > 0 && diffNeeded >= itemPrice) {
+                    const usableQty = Math.floor(diffNeeded / itemPrice);
+                    if (usableQty > 0) {
+                        const usableTotal = usableQty * itemPrice;
+                        selected.push({
+                            ...item,
+                            qty: usableQty,
+                            total: usableTotal
+                        });
+                        accumulated += usableTotal;
+                    }
+                } else if (itemPrice > 0) {
+                    if (Math.abs((accumulated + itemPrice) - targetExportRevenue) < Math.abs(accumulated - targetExportRevenue)) {
+                        selected.push({
+                            ...item,
+                            qty: 1,
+                            total: itemPrice
+                        });
+                        accumulated += itemPrice;
+                    }
                 }
                 break;
             } else {
@@ -1279,55 +1323,7 @@ function exportToEasyInvoiceExcel() {
             return;
         }
 
-        const groupIdentical = true;
-
-        // Collect ALL items across all orders
-        let allItemsList = [];
-        filteredOrders.forEach(order => {
-            order.items.forEach(item => {
-                allItemsList.push({
-                    name: item.name,
-                    unit: item.unit,
-                    qty: Number(item.qty || 0),
-                    price: Number(item.price || 0),
-                    total: Number(item.total || 0),
-                    isTopping: Boolean(item.isTopping),
-                    isGift: Boolean(item.isGift)
-                });
-            });
-        });
-
-        if (groupIdentical) {
-            // Group identical items together by (Name + Unit + Price)
-            const groupedMap = new Map();
-            allItemsList.forEach(item => {
-                const key = `${item.name}|${item.unit}|${item.price}`;
-                if (!groupedMap.has(key)) {
-                    groupedMap.set(key, { ...item });
-                } else {
-                    const existing = groupedMap.get(key);
-                    existing.qty += Number(item.qty || 0);
-                    existing.total += Number(item.total || 0);
-                }
-            });
-            allItemsList = Array.from(groupedMap.values());
-            allItemsList.sort((a, b) => b.qty - a.qty);
-        }
-
-        const totalPosRevenue = filteredOrders.reduce((sum, o) => sum + Number(o.finalTotal || 0), 0);
-        const deductFood = parseDeductInput('deduct-food-input');
-        const deductGrab = parseDeductInput('deduct-grab-input');
-        const deductOther = parseDeductInput('deduct-other-input');
-        const totalDeduction = deductFood + deductGrab + deductOther;
-        const targetExportRevenue = Math.max(0, totalPosRevenue - totalDeduction);
-
-        const dateStr = document.getElementById('date-input')?.value || new Date().toISOString().split('T')[0];
-        const numInvVal = document.getElementById('num-invoices-input')?.value;
-        const customNumInvoices = numInvVal ? (parseInt(numInvVal) || 0) : 0;
-        const linesVal = document.getElementById('target-lines-input')?.value;
-        const targetLines = linesVal ? (parseInt(linesVal) || 30) : 30;
-
-        const exportRows = compileEasyInvoiceRecords(allItemsList, dateStr, customNumInvoices, targetLines, targetExportRevenue);
+        const { allItemsList, exportRows, dateStr } = prepareEasyInvoiceData();
 
         if (!exportRows || exportRows.length === 0) {
             showToast("Không có dòng sản phẩm nào sau khi lọc để xuất EasyInvoice!", "error");
