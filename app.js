@@ -360,22 +360,25 @@ const posAppSessionCache = new Map();
 
 function resetKpiStatsToLoading() {
     const totalOrdersEl = document.getElementById('stat-total-orders');
-    if (totalOrdersEl) totalOrdersEl.innerText = '...';
+    if (totalOrdersEl) totalOrdersEl.innerHTML = `<span class="skeleton-box" style="width: 55px; height: 28px;"></span>`;
 
     const totalCupsEl = document.getElementById('stat-total-cups');
-    if (totalCupsEl) totalCupsEl.innerText = '...';
+    if (totalCupsEl) totalCupsEl.innerHTML = `<span class="skeleton-box" style="width: 75px; height: 28px;"></span>`;
 
     const cupsBreakdownEl = document.getElementById('stat-cups-breakdown');
-    if (cupsBreakdownEl) cupsBreakdownEl.innerText = 'Đang tải dữ liệu từ PosApp...';
+    if (cupsBreakdownEl) cupsBreakdownEl.innerText = '⚡ Đang đồng bộ hóa đơn PosApp...';
 
     const totalRevEl = document.getElementById('stat-total-revenue');
-    if (totalRevEl) totalRevEl.innerText = '...';
+    if (totalRevEl) totalRevEl.innerHTML = `<span class="skeleton-box" style="width: 110px; height: 28px;"></span>`;
 
     const avgOrderEl = document.getElementById('stat-avg-order');
-    if (avgOrderEl) avgOrderEl.innerText = '...';
+    if (avgOrderEl) avgOrderEl.innerHTML = `<span class="skeleton-box" style="width: 85px; height: 28px;"></span>`;
 
     const toppingsEl = document.getElementById('stat-toppings-total');
-    if (toppingsEl) toppingsEl.innerText = 'Đang lấy báo cáo...';
+    if (toppingsEl) toppingsEl.innerText = '☕ Đang tổng hợp số ly & topping...';
+
+    const targetBadgeEl = document.getElementById('target-export-revenue-badge');
+    if (targetBadgeEl) targetBadgeEl.innerHTML = `<span class="skeleton-box" style="width: 130px; height: 32px;"></span>`;
 
     const summarySection = document.getElementById('easyinvoice-summary-section');
     if (summarySection) summarySection.classList.add('hidden');
@@ -1011,10 +1014,11 @@ function updateEasyInvoiceSummary() {
     const maxHdRevenue = Math.max(...hdList.map(h => h.total)) || 1;
 
     let pillsHtml = '';
-    hdList.forEach(hd => {
+    hdList.forEach((hd, index) => {
         const percent = Math.min(100, Math.max(10, Math.round((hd.total / maxHdRevenue) * 100)));
+        const delay = (index * 0.06).toFixed(2);
         pillsHtml += `
-            <div class="hd-card">
+            <div class="hd-card animate-fade-in-up" style="animation-delay: ${delay}s;">
                 <div class="hd-card-header">
                     <span class="hd-card-code"><i data-lucide="file-text"></i> ${hd.code}</span>
                     <span class="hd-card-lines">${hd.count} dòng</span>
