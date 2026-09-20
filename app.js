@@ -3,27 +3,32 @@
 // Branch Preset Credentials
 const BRANCH_PRESETS = {
     'xuanloc': {
-        name: 'Xuân Lộc (H462 - 172 Hùng Vương)',
+        name: 'Xuân Lộc H462',
+        exportPrefix: 'XuanLoc',
         shopId: '1538768676',
         token: '8111b203738d26f78e57'
     },
     'longkhanh': {
-        name: 'Long Khánh (250 Hùng Vương)',
+        name: 'Long Khánh H062',
+        exportPrefix: 'LongKhanh',
         shopId: '1782383258',
         token: 'e09b2a2d516713c4c78b'
     },
     'bienhoa': {
-        name: 'Biên Hòa (1152 Nguyễn Ái Quốc)',
+        name: 'Biên Hòa H095',
+        exportPrefix: 'BienHoa',
         shopId: '1809766943',
         token: 'a9703b4eb03afe14f651'
     },
     'longthanh': {
-        name: 'Long Thành (231 Lê Duẩn)',
+        name: 'Long Thành H029',
+        exportPrefix: 'LongThanh',
         shopId: '35844479',
         token: '1b8e0ffcc30642d30ae9'
     },
     'leduan': {
-        name: 'Lê Duẩn (Cửa hàng 04)',
+        name: 'Lê Duẩn H207',
+        exportPrefix: 'LeDuan',
         shopId: '1801969403',
         token: '6e9e729a16e77e553849'
     }
@@ -1429,7 +1434,7 @@ function exportToEasyInvoiceExcel() {
 
         const branchSelectEl = document.getElementById('branch-select');
         const branchKey = branchSelectEl ? branchSelectEl.value : 'xuanloc';
-        const branchPrefix = (branchKey !== 'custom' && BRANCH_PRESETS[branchKey]) ? BRANCH_PRESETS[branchKey].name.split(' ')[0] : "PosApp";
+        const branchPrefix = (branchKey !== 'custom' && BRANCH_PRESETS[branchKey]) ? (BRANCH_PRESETS[branchKey].exportPrefix || "PosApp") : "PosApp";
         
         // Format date string for filename (e.g. 15-09-2026)
         let dateFilename = dateStr;
