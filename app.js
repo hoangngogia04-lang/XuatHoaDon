@@ -1267,26 +1267,53 @@ function compileEasyInvoiceRecords(rawItemsList, dateStr, customNumInvoices = 0,
         numInvoices = Math.max(1, Math.round(totalItemsCount / targetLines));
     }
 
-    // Sort items descending by total value so large items are distributed first
-    const sortedItems = [...validItemsList].sort((a, b) => Number(b.total || 0) - Number(a.total || 0));
+    // Calculate natural asymmetric weights for numInvoices to ensure varied, realistic invoice totals
+    function getNaturalInvoiceWeights(count) {
+        if (count <= 1) return [1.0];
+        const baseRatios = [];
+        let remaining = 1.0;
+        for (let i = 0; i < count; i++) {
+            if (i === count - 1) {
+                baseRatios.push(Number(remaining.toFixed(4)));
+            } else {
+                const avg = remaining / (count - i);
+                const multiplier = (i % 2 === 0) ? (1.38 - (i * 0.08)) : (0.72 + (i * 0.06));
+                const weight = Number(Math.min(remaining * 0.6, Math.max(avg * 0.5, avg * multiplier)).toFixed(4));
+                baseRatios.push(weight);
+                remaining -= weight;
+            }
+        }
+        return baseRatios;
+    }
 
-    // Initialize invoice bins
+    const weights = getNaturalInvoiceWeights(numInvoices);
+    const targetRevenuePerBin = weights.map(w => w * targetExportRevenue);
+
+    // Initialize invoice bins with natural target revenues
     const invoiceBins = Array.from({ length: numInvoices }, (_, i) => ({
+        index: i,
         code: `HD${i + 1}`,
         items: [],
         totalRevenue: 0,
-        lineCount: 0
+        lineCount: 0,
+        targetRevenue: targetRevenuePerBin[i]
     }));
 
-    const maxLinesLimit = Math.ceil(totalItemsCount / numInvoices) + 2;
+    const maxLinesLimit = Math.ceil(totalItemsCount / numInvoices) + 4;
 
-    // Balanced distribution (Greedy / Min-Revenue bin allocation with line capacity constraint)
+    const sortedItems = [...validItemsList].sort((a, b) => Number(b.total || 0) - Number(a.total || 0));
+
+    // Distribute items to match asymmetric target revenues so invoice totals are distinctly varied
     sortedItems.forEach(item => {
         let validBins = invoiceBins.filter(b => b.lineCount < maxLinesLimit);
         if (validBins.length === 0) validBins = invoiceBins;
         
-        // Pick bin with lowest current revenue
-        validBins.sort((a, b) => a.totalRevenue - b.totalRevenue || a.lineCount - b.lineCount);
+        // Pick bin with highest deficit ratio relative to its target revenue
+        validBins.sort((a, b) => {
+            const deficitA = (a.targetRevenue - a.totalRevenue) / (a.targetRevenue || 1);
+            const deficitB = (b.targetRevenue - b.totalRevenue) / (b.targetRevenue || 1);
+            return deficitB - deficitA;
+        });
         const bestBin = validBins[0];
         
         bestBin.items.push(item);
