@@ -7,7 +7,7 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Lucide Icons -->
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.321.0/dist/umd/lucide.min.js"></script>
     <!-- SheetJS (xlsx) for Excel Export -->
@@ -16,18 +16,20 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Header -->
+        
+        <!-- Top Compact Control Header -->
         <header class="app-header">
             <div class="logo-section">
                 <div class="logo-icon">🌿</div>
                 <div class="logo-text">
                     <h1>NGÔ GIA POS</h1>
-                    <p>Báo Cáo Hóa Đơn & Số Ly Theo Thời Gian Thực (PosApp)</p>
+                    <p>Báo cáo hóa đơn & số ly</p>
                 </div>
             </div>
+            
             <div class="header-controls">
-                <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <label style="font-size: 11px; color: var(--text-secondary);">Chi Nhánh Cửa Hàng</label>
+                <div class="control-group">
+                    <label>Chi nhánh</label>
                     <select id="branch-select" class="custom-select">
                         <option value="xuanloc">Xuân Lộc H462</option>
                         <option value="longkhanh">Long Khánh H062</option>
@@ -38,32 +40,32 @@
                     </select>
                 </div>
 
-                <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <label style="font-size: 11px; color: var(--text-secondary);">Ngày Xem Báo Cáo</label>
+                <div class="control-group">
+                    <label>Ngày báo cáo</label>
                     <input type="date" id="date-input" class="custom-input">
                 </div>
 
-                <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <label style="font-size: 11px; color: var(--text-secondary);">Số HĐ Chia (Ví dụ: 3)</label>
-                    <input type="number" id="num-invoices-input" class="custom-input" placeholder="Tự động" min="1" max="50" style="width: 100px;">
+                <div class="control-group">
+                    <label>Số HĐ</label>
+                    <input type="number" id="num-invoices-input" class="custom-input" placeholder="Tự động" min="1" max="50" style="width: 80px;">
                 </div>
 
-                <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <label style="font-size: 11px; color: var(--text-secondary);">Số Dòng/HĐ</label>
-                    <input type="number" id="target-lines-input" class="custom-input" value="30" min="10" max="100" style="width: 90px;">
+                <div class="control-group">
+                    <label>Dòng/HĐ</label>
+                    <input type="number" id="target-lines-input" class="custom-input" value="30" min="10" max="100" style="width: 80px;">
                 </div>
 
-                <div style="display: flex; flex-direction: column; gap: 4px; justify-content: flex-end;">
-                    <label style="font-size: 11px; color: transparent;">Thao tác</label>
+                <div class="control-group action-group">
+                    <label style="opacity: 0;">Lấy dữ liệu</label>
                     <button id="fetch-btn" class="primary-btn">
-                        <i data-lucide="refresh-cw"></i> Lấy Dữ Liệu
+                        <i data-lucide="refresh-cw"></i> LẤY DỮ LIỆU
                     </button>
                 </div>
             </div>
         </header>
 
         <!-- Custom Creds Modal/Row if custom selected -->
-        <div id="custom-creds-row" class="glass-card hidden" style="padding: 14px 20px;">
+        <div id="custom-creds-row" class="glass-card hidden" style="padding: 12px 18px;">
             <div style="display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 12px; align-items: center;">
                 <input type="text" id="custom-shop-id" class="custom-input" placeholder="Shop ID PosApp (ví dụ: 1538768676)">
                 <input type="text" id="custom-token" class="custom-input" placeholder="PosApp-Token (ví dụ: 8111b203738d26f78e57)">
@@ -71,141 +73,115 @@
             </div>
         </div>
 
-        <!-- Deduction Inputs Section for EasyInvoice Export -->
-        <div class="glass-card" style="padding: 16px 22px; margin-bottom: 20px; border-left: 4px solid #3b82f6;">
-            <div class="deduction-card-inner" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <div style="background: rgba(59, 130, 246, 0.15); border-radius: 8px; padding: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                        <i data-lucide="calculator" style="color: #60a5fa; width: 20px; height: 20px;"></i>
+        <!-- 🧮 Section: Điều Chỉnh Doanh Thu (Doanh Thu Thực Tế Nổi Bật) -->
+        <section class="glass-card deduction-section">
+            <div class="deduction-container">
+                <div class="deduction-left">
+                    <div class="section-badge-title">
+                        <i data-lucide="calculator" style="color: #60a5fa; width: 18px; height: 18px;"></i>
+                        <h4>🧮 ĐIỀU CHỈNH DOANH THU</h4>
                     </div>
-                    <div>
-                        <h4 style="font-size: 14px; font-weight: 600; color: #fff; margin: 0;">Trừ Doanh Thu Xuất Hóa Đơn (Tùy chọn)</h4>
-                        <p style="font-size: 11px; color: #94a3b8; margin: 2px 0 0 0;">Nhập số tiền phế App hoặc khoản trừ khác để tự động giảm tổng tiền EasyInvoice</p>
+                    <div class="deduction-inputs">
+                        <div class="input-field">
+                            <label>Food (ShopeeFood)</label>
+                            <input type="text" inputmode="numeric" id="deduct-food-input" class="custom-input" placeholder="0đ">
+                        </div>
+                        <div class="input-field">
+                            <label>Grab (GrabFood)</label>
+                            <input type="text" inputmode="numeric" id="deduct-grab-input" class="custom-input" placeholder="0đ">
+                        </div>
+                        <div class="input-field">
+                            <label>Tiền Còn Lại / Khác</label>
+                            <input type="text" inputmode="numeric" id="deduct-other-input" class="custom-input" placeholder="0đ">
+                        </div>
                     </div>
                 </div>
-                <div class="deduction-inputs-group" style="display: flex; gap: 14px; flex-wrap: wrap; align-items: center;">
-                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                        <label style="font-size: 11px; color: #cbd5e1; font-weight: 500;">Trừ Food (ShopeeFood)</label>
-                        <input type="text" inputmode="numeric" id="deduct-food-input" class="custom-input" placeholder="0đ" style="width: 135px; font-weight: 600;">
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                        <label style="font-size: 11px; color: #cbd5e1; font-weight: 500;">Trừ Grab (GrabFood)</label>
-                        <input type="text" inputmode="numeric" id="deduct-grab-input" class="custom-input" placeholder="0đ" style="width: 135px; font-weight: 600;">
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                        <label style="font-size: 11px; color: #cbd5e1; font-weight: 500;">Trừ Tiền Còn Lại / Khác</label>
-                        <input type="text" inputmode="numeric" id="deduct-other-input" class="custom-input" placeholder="0đ" style="width: 145px; font-weight: 600;">
-                    </div>
-                    <div class="deduction-result-badge" style="display: flex; flex-direction: column; gap: 4px; padding-left: 12px; border-left: 1px solid rgba(255,255,255,0.12);">
-                        <label style="font-size: 11px; color: #10b981; font-weight: 600;">Cần Xuất EasyInvoice</label>
-                        <span id="target-export-revenue-badge" style="font-size: 16px; font-weight: 700; color: #10b981;">0đ</span>
-                    </div>
+
+                <div class="deduction-right">
+                    <span class="revenue-target-label">DOANH THU EASYINVOICE (CẦN XUẤT)</span>
+                    <h2 id="target-export-revenue-badge" class="revenue-target-amount">0đ</h2>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <!-- KPI Metrics Row -->
+        <!-- 4 KPI Summary Cards (Thoáng, nổi bật con số chính) -->
         <section class="kpi-grid">
             <div class="kpi-card">
-                <div class="kpi-icon">
-                    <i data-lucide="receipt"></i>
-                </div>
                 <div class="kpi-info">
-                    <p>Tổng Số Hóa Đơn</p>
                     <h3 id="stat-total-orders">0</h3>
+                    <p class="kpi-label">HÓA ĐƠN</p>
                     <div class="kpi-subtext" id="stat-orders-sub">Chưa tải dữ liệu</div>
                 </div>
             </div>
 
             <div class="kpi-card">
-                <div class="kpi-icon">
-                    <i data-lucide="coffee"></i>
-                </div>
                 <div class="kpi-info">
-                    <p>Tổng Số Ly Nước</p>
                     <h3 id="stat-total-cups">0 ly</h3>
+                    <p class="kpi-label">TỔNG SỐ LY</p>
                     <div class="kpi-subtext" id="stat-cups-breakdown">0 ly Vừa | 0 ly Lớn</div>
                 </div>
             </div>
 
             <div class="kpi-card">
-                <div class="kpi-icon">
-                    <i data-lucide="banknote"></i>
-                </div>
                 <div class="kpi-info">
-                    <p>Tổng Doanh Thu</p>
-                    <h3 id="stat-total-revenue">0đ</h3>
+                    <h3 id="stat-total-revenue" style="color: #10b981;">0đ</h3>
+                    <p class="kpi-label">TỔNG DOANH THU</p>
                     <div class="kpi-subtext" id="stat-revenue-sub">Thực thu sau giảm giá</div>
                 </div>
             </div>
 
             <div class="kpi-card">
-                <div class="kpi-icon">
-                    <i data-lucide="calculator"></i>
-                </div>
                 <div class="kpi-info">
-                    <p>Doanh Thu TB / Hóa Đơn</p>
                     <h3 id="stat-avg-order">0đ</h3>
+                    <p class="kpi-label">TB / HÓA ĐƠN</p>
                     <div class="kpi-subtext" id="stat-toppings-total">0 phần Topping</div>
                 </div>
             </div>
         </section>
 
-        <!-- EasyInvoice Summary Section & Thống Kê Phân Bổ Hóa Đơn (Matching User Screenshot media_1789739093960.png) -->
-        <section id="easyinvoice-summary-section" class="glass-card hidden" style="padding: 22px 26px; display: flex; flex-direction: column; gap: 20px;">
-            
-            <!-- Header: Thống Kê Phân Bổ Hóa Đơn & Action Buttons -->
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 4px;">
-                <h3 style="font-size: 18px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 10px; margin: 0;">
-                    <i data-lucide="bar-chart-3" style="color: #60a5fa; width: 22px; height: 22px;"></i> Thống Kê Phân Bổ Hóa Đơn
-                </h3>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                    <button id="export-easyinvoice-btn" class="primary-btn" style="padding: 10px 20px; font-size: 14px;">
+        <!-- 📊 Section: Phân Bổ Hóa Đơn EasyInvoice (Card & Progress Bar) -->
+        <section id="easyinvoice-summary-section" class="glass-card hidden">
+            <!-- Section Header & Action Buttons -->
+            <div class="summary-header">
+                <div class="summary-title">
+                    <i data-lucide="bar-chart-3" style="color: #60a5fa; width: 22px; height: 22px;"></i>
+                    <h3>📊 PHÂN BỔ HÓA ĐƠN</h3>
+                </div>
+                <div class="summary-actions">
+                    <button id="export-easyinvoice-btn" class="primary-btn">
                         <i data-lucide="file-spreadsheet"></i> Xuất EasyInvoice (43 Cột)
                     </button>
-                    <button id="export-excel-btn" class="secondary-btn" style="padding: 10px 18px; font-size: 14px;">
+                    <button id="export-excel-btn" class="secondary-btn">
                         <i data-lucide="download"></i> Báo Cáo Nội Bộ
                     </button>
                 </div>
             </div>
 
-            <!-- 4 KPI Cards Grid matching user screenshot media_1789739093960.png -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px;">
-                <!-- Card 1: Tổng Hóa Đơn -->
-                <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px 20px;">
-                    <p style="font-size: 13px; color: #94a3b8; font-weight: 500; margin: 0 0 6px 0;">Tổng hóa đơn</p>
-                    <h3 id="easy-stat-hd-count" style="font-size: 26px; font-weight: 700; color: #ffffff; margin: 0;">0</h3>
+            <!-- Tier 1: Summary Bar -->
+            <div class="distribution-meta-bar">
+                <div class="meta-item">
+                    <span>HÓA ĐƠN</span>
+                    <strong id="easy-stat-hd-count">0</strong>
                 </div>
-
-                <!-- Card 2: Tổng Số Dòng -->
-                <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px 20px;">
-                    <p style="font-size: 13px; color: #94a3b8; font-weight: 500; margin: 0 0 6px 0;">Tổng số dòng</p>
-                    <h3 id="easy-stat-lines-count" style="font-size: 26px; font-weight: 700; color: #ffffff; margin: 0;">0</h3>
+                <div class="meta-item">
+                    <span>SỐ DÒNG</span>
+                    <strong id="easy-stat-lines-count">0</strong>
                 </div>
-
-                <!-- Card 3: Tổng Số Ly -->
-                <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px 20px;">
-                    <p style="font-size: 13px; color: #94a3b8; font-weight: 500; margin: 0 0 6px 0;">Tổng số ly</p>
-                    <h3 id="easy-stat-cups-count" style="font-size: 26px; font-weight: 700; color: #ffffff; margin: 0;">0 ly</h3>
+                <div class="meta-item">
+                    <span>SỐ LY</span>
+                    <strong id="easy-stat-cups-count">0 ly</strong>
                 </div>
-
-                <!-- Card 4: Doanh Thu Thực Tế -->
-                <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px 20px;">
-                    <p style="font-size: 13px; color: #94a3b8; font-weight: 500; margin: 0 0 6px 0;">Doanh thu thực tế</p>
-                    <h3 id="easy-stat-revenue" style="font-size: 26px; font-weight: 700; color: #10b981; margin: 0;">0đ</h3>
+                <div class="meta-item highlight">
+                    <span>DOANH THU THỰC TẾ</span>
+                    <strong id="easy-stat-revenue" style="color: #10b981;">0đ</strong>
                 </div>
+                <span id="easyinvoice-summary-meta" class="meta-tag">0 HĐ</span>
             </div>
 
-            <!-- Section: Chi tiết từng hóa đơn EasyInvoice -->
-            <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 16px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <h4 style="font-size: 15px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 8px; margin: 0;">
-                        <i data-lucide="file-spreadsheet" style="color: #10b981;"></i> Chi tiết từng hóa đơn EasyInvoice (Cân bằng tiền):
-                    </h4>
-                    <span id="easyinvoice-summary-meta" style="font-size: 12px; color: #94a3b8; background: rgba(255,255,255,0.06); padding: 4px 12px; border-radius: 20px;">0 HĐ</span>
-                </div>
-                <div id="easyinvoice-pills-container" style="display: flex; flex-wrap: wrap; gap: 12px;">
-                    <!-- HD Pills rendered dynamically -->
+            <!-- Tier 2: Interactive HD Cards Grid -->
+            <div class="hd-grid-container">
+                <div id="easyinvoice-pills-container" class="hd-grid">
+                    <!-- Dynamic HD Cards rendered by app.js -->
                 </div>
             </div>
         </section>

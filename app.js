@@ -1008,16 +1008,20 @@ function updateEasyInvoiceSummary() {
     if (cupsCountEl) cupsCountEl.innerText = `${totalCupsCount} ly`;
     if (revenueEl) revenueEl.innerText = `${actualRevenue.toLocaleString('vi-VN')}đ`;
 
+    const maxHdRevenue = Math.max(...hdList.map(h => h.total)) || 1;
+
     let pillsHtml = '';
     hdList.forEach(hd => {
+        const percent = Math.min(100, Math.max(10, Math.round((hd.total / maxHdRevenue) * 100)));
         pillsHtml += `
-            <div class="hd-pill-card">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <i data-lucide="file-text" style="color: #60a5fa; width: 18px; height: 18px;"></i>
-                    <span style="font-weight: 700; color: #fff; font-size: 15px;">${hd.code}:</span>
-                    <span style="color: #10b981; font-weight: 600; font-size: 14px;">${hd.count} dòng</span>
-                    <span style="color: #9ca3af; font-size: 14px;">-</span>
-                    <strong style="color: #f3f4f6; font-size: 15px;">${hd.total.toLocaleString('vi-VN')}đ</strong>
+            <div class="hd-card">
+                <div class="hd-card-header">
+                    <span class="hd-card-code"><i data-lucide="file-text"></i> ${hd.code}</span>
+                    <span class="hd-card-lines">${hd.count} dòng</span>
+                </div>
+                <div class="hd-card-amount">${hd.total.toLocaleString('vi-VN')}đ</div>
+                <div class="hd-progress-track">
+                    <div class="hd-progress-bar" style="width: ${percent}%;"></div>
                 </div>
             </div>
         `;
@@ -1025,9 +1029,10 @@ function updateEasyInvoiceSummary() {
     pillsContainer.innerHTML = pillsHtml;
 
     if (metaSpan) {
-        metaSpan.innerText = `Tổng ${hdList.length} Hóa Đơn (Tự động cân bằng tiền)`;
+        metaSpan.innerText = `Tổng ${hdList.length} Hóa Đơn (Phân bổ tự nhiên)`;
     }
     summarySection.classList.remove('hidden');
+    lucide.createIcons();
     lucide.createIcons();
 }
 
