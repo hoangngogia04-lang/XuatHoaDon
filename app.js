@@ -622,7 +622,7 @@ function parsePosAppOrdersJson(resData, branchName) {
                     discount: discPrice,
                     surcharge: parseFloat(prod.surcharge_price || prod.surcharge || 0),
                     finalPrice: baseFinalPrice,
-                    total: qty * baseFinalPrice,
+                    total: qty * price,
                     isTopping: true
                 });
             } else {
@@ -632,6 +632,7 @@ function parsePosAppOrdersJson(resData, branchName) {
                     smallCups += qty;
                 }
 
+                const fullUnitPrice = price + toppingTotalPricePerCup;
                 const finalUnitPrice = baseFinalPrice + toppingTotalPricePerCup;
                 
                 // Format name matching user reference screenshot (media_1789737235340.png)
@@ -647,11 +648,11 @@ function parsePosAppOrdersJson(resData, branchName) {
                     name: mergedItemName,
                     unit: unit,
                     qty: qty,
-                    price: price + toppingTotalPricePerCup,
+                    price: fullUnitPrice,
                     discount: discPrice,
                     surcharge: parseFloat(prod.surcharge_price || prod.surcharge || 0),
                     finalPrice: finalUnitPrice,
-                    total: qty * finalUnitPrice,
+                    total: qty * fullUnitPrice,
                     isTopping: false
                 });
             }
@@ -937,16 +938,21 @@ function prepareEasyInvoiceData() {
         // Group identical items together by (Name + Unit + Price)
         const groupedMap = new Map();
         allItemsList.forEach(item => {
-            const key = `${item.name}|${item.unit}|${item.price}`;
+            const itemPrice = Number(item.price || 0);
+            const key = `${item.name}|${item.unit}|${itemPrice}`;
             if (!groupedMap.has(key)) {
-                groupedMap.set(key, { ...item });
+                groupedMap.set(key, { ...item, price: itemPrice, total: Number(item.qty || 0) * itemPrice });
             } else {
                 const existing = groupedMap.get(key);
                 existing.qty += Number(item.qty || 0);
-                existing.total += Number(item.total || 0);
+                existing.total = existing.qty * existing.price;
             }
         });
         allItemsList = Array.from(groupedMap.values());
+        // Bảo đảm 100% toán học: Thành tiền = Số lượng * Đơn giá cho từng dòng
+        allItemsList.forEach(item => {
+            item.total = Number(item.qty || 0) * Number(item.price || 0);
+        });
         allItemsList.sort((a, b) => b.qty - a.qty || b.total - a.total);
     }
 
@@ -1339,9 +1345,13 @@ function compileEasyInvoiceRecords(rawItemsList, dateStr, customNumInvoices = 0,
 
     invoiceBins.forEach(bin => {
         bin.items.forEach((item, lineIndex) => {
+            const itemQty = Number(item.qty || 0);
+            const itemPrice = Number(item.price || 0);
+            const itemTotal = itemQty * itemPrice; // BẢO ĐẢM TOÁN HỌC: Thành Tiền = Số Lượng * Đơn Giá!
+
             const row = {
-                "MaHD(*)": bin.code,
-                "NgayHoaDon(*)": formattedDate,
+                "MaHD": bin.code,
+                "NgayHoaDon": formattedDate,
                 "MaKhachHang": "",
                 "TenNguoiMua": " bán cho người tiêu dùng",
                 "TenDonVi": "",
@@ -1352,18 +1362,18 @@ function compileEasyInvoiceRecords(rawItemsList, dateStr, customNumInvoices = 0,
                 "NgayBangKe": "",
                 "SOTKKHACH": "",
                 "TENNHKHACH": "",
-                "HinhThucThanhToan(*)": "Tiền mặt /Chuyển khoản",
-                "ThueSuat(*)": "-1",
+                "HinhThucThanhToan": "Tiền mặt /Chuyển khoản",
+                "ThueSuat": "-1",
                 "ThueSuatKhac": "",
                 "MaHang": "",
-                "TenHangHoa(*)": item.name,
+                "TenHangHoa": item.name,
                 "DVT": item.isTopping ? "phần" : (item.unit && (item.unit.includes("1000cc") || item.unit.includes("Lớn")) ? "Ly" : "Ly"),
-                "SoLuong": Number(item.qty || 0),
-                "DonGia": Number(item.price || 0),
-                "ThanhTien": Number(item.total || 0),
+                "SoLuong": itemQty,
+                "DonGia": itemPrice,
+                "ThanhTien": itemTotal,
                 "TienTe": "VND",
                 "SoTT": lineIndex + 1,
-                "TinhChat(*)": "1",
+                "TinhChat": "1",
                 "Email": "",
                 "Ghichu": "",
                 "TyGia": "",
@@ -1382,27 +1392,7 @@ function compileEasyInvoiceRecords(rawItemsList, dateStr, customNumInvoices = 0,
                 "TenNguoiGuiHang": "",
                 "DiaChiNguoiGuiHang": "",
                 "MaSoThueNguoiGuiHang": "",
-                "SoDinhDanhNguoiGuiHang": "",
-                "Madiadiemkinhdoanh": "",
-                "Tendiadiemkinhdoanh": "",
-                "Diachidiadiemkinhdoanh": "",
-                "MaTinh": "",
-                "MaXa": "",
-                "LoaiTaiSan": "",
-                "TinhTrangTaiSan": "",
-                "XuatXu": "",
-                "SoGiayChungNhanChatLuongATKTVaBVMT": "",
-                "SoSeriPhieuKiemTraChatLuongXuatXuong": "",
-                "MaNuocSanXuat": "",
-                "TenLoaiTaiSanDangKy": "",
-                "NamSanXuat": "",
-                "TenThuongMai": "",
-                "TenNhanHieu": "",
-                "KieuLoaiXe": "",
-                "TheTichLamViecHoacCongSuat": "",
-                "TrongTai": "",
-                "SoNguoiChoPhepCho": "",
-                "SoBienKiemSoat": ""
+                "SoDinhDanhNguoiGuiHang": ""
             };
             exportRows.push(row);
         });
