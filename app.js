@@ -989,7 +989,7 @@ function updateEasyInvoiceSummary() {
     // Group exportRows by MaHD
     const hdMap = new Map();
     exportRows.forEach(r => {
-        const code = r.MaHD;
+        const code = r['MaHD(*)'] || r.MaHD;
         if (!hdMap.has(code)) {
             hdMap.set(code, { code: code, count: 0, total: 0 });
         }
@@ -1340,8 +1340,8 @@ function compileEasyInvoiceRecords(rawItemsList, dateStr, customNumInvoices = 0,
     invoiceBins.forEach(bin => {
         bin.items.forEach((item, lineIndex) => {
             const row = {
-                "MaHD": bin.code,
-                "NgayHoaDon": formattedDate,
+                "MaHD(*)": bin.code,
+                "NgayHoaDon(*)": formattedDate,
                 "MaKhachHang": "",
                 "TenNguoiMua": " bán cho người tiêu dùng",
                 "TenDonVi": "",
@@ -1352,18 +1352,18 @@ function compileEasyInvoiceRecords(rawItemsList, dateStr, customNumInvoices = 0,
                 "NgayBangKe": "",
                 "SOTKKHACH": "",
                 "TENNHKHACH": "",
-                "HinhThucThanhToan": "Tiền mặt /Chuyển khoản",
-                "ThueSuat": "-1",
+                "HinhThucThanhToan(*)": "Tiền mặt /Chuyển khoản",
+                "ThueSuat(*)": "-1",
                 "ThueSuatKhac": "",
                 "MaHang": "",
-                "TenHangHoa": item.name,
+                "TenHangHoa(*)": item.name,
                 "DVT": item.isTopping ? "phần" : (item.unit && (item.unit.includes("1000cc") || item.unit.includes("Lớn")) ? "Ly" : "Ly"),
                 "SoLuong": Number(item.qty || 0),
                 "DonGia": Number(item.price || 0),
                 "ThanhTien": Number(item.total || 0),
                 "TienTe": "VND",
                 "SoTT": lineIndex + 1,
-                "TinhChat": "1",
+                "TinhChat(*)": "1",
                 "Email": "",
                 "Ghichu": "",
                 "TyGia": "",
@@ -1382,7 +1382,27 @@ function compileEasyInvoiceRecords(rawItemsList, dateStr, customNumInvoices = 0,
                 "TenNguoiGuiHang": "",
                 "DiaChiNguoiGuiHang": "",
                 "MaSoThueNguoiGuiHang": "",
-                "SoDinhDanhNguoiGuiHang": ""
+                "SoDinhDanhNguoiGuiHang": "",
+                "Madiadiemkinhdoanh": "",
+                "Tendiadiemkinhdoanh": "",
+                "Diachidiadiemkinhdoanh": "",
+                "MaTinh": "",
+                "MaXa": "",
+                "LoaiTaiSan": "",
+                "TinhTrangTaiSan": "",
+                "XuatXu": "",
+                "SoGiayChungNhanChatLuongATKTVaBVMT": "",
+                "SoSeriPhieuKiemTraChatLuongXuatXuong": "",
+                "MaNuocSanXuat": "",
+                "TenLoaiTaiSanDangKy": "",
+                "NamSanXuat": "",
+                "TenThuongMai": "",
+                "TenNhanHieu": "",
+                "KieuLoaiXe": "",
+                "TheTichLamViecHoacCongSuat": "",
+                "TrongTai": "",
+                "SoNguoiChoPhepCho": "",
+                "SoBienKiemSoat": ""
             };
             exportRows.push(row);
         });
@@ -1391,7 +1411,7 @@ function compileEasyInvoiceRecords(rawItemsList, dateStr, customNumInvoices = 0,
     return exportRows;
 }
 
-// Export EasyInvoice 43-Column Standard Excel Format (Matching LongKhanh_04-09-2026.xlsx with HD1, HD2...)
+// Export EasyInvoice Standard Excel Format (Matching 63-column template with HD1, HD2...)
 // Helper for cross-platform Excel download (Blob fallback for mobile browsers!)
 function downloadExcelWorkbook(wb, filename) {
     try {
@@ -1448,7 +1468,7 @@ function exportToEasyInvoiceExcel() {
         const filename = `${branchPrefix}_${dateFilename}.xlsx`;
         downloadExcelWorkbook(wb, filename);
 
-        const uniqueHDs = new Set(exportRows.map(r => r.MaHD)).size;
+        const uniqueHDs = new Set(exportRows.map(r => r['MaHD(*)'] || r.MaHD)).size;
         showToast(`Đã tổng hợp ${allItemsList.length} dòng sản phẩm thành ${uniqueHDs} Hóa Đơn (HD1 -> HD${uniqueHDs}) và xuất file ${filename} thành công!`, "success");
     } catch (err) {
         console.error("Lỗi xuất EasyInvoice:", err);
