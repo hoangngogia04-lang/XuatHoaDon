@@ -133,6 +133,110 @@
             </div>
         </section>
 
+        <!-- 🔍 Section: Xuất Hóa Đơn Riêng Theo Mã Đơn (Công Ty / Đơn Lẻ) -->
+        <section class="glass-card single-order-section">
+            <div class="single-order-header">
+                <div class="section-badge-title">
+                    <i data-lucide="receipt" style="color: #0284c7; width: 20px; height: 20px;"></i>
+                    <h4>🔍 XUẤT HÓA ĐƠN RIÊNG THEO MÃ ĐƠN (CÔNG TY / ĐƠN LẺ)</h4>
+                </div>
+                <span class="single-order-subtitle">Tìm kiếm mã hóa đơn trong ngày để xuất riêng 1 file Excel EasyInvoice (ví dụ: công ty đặt 30 ly cần xuất riêng 1 hóa đơn)</span>
+            </div>
+
+            <!-- Search Bar Wrapper -->
+            <div class="single-order-search-container">
+                <div class="search-input-box">
+                    <i data-lucide="search" class="search-icon"></i>
+                    <input type="text" id="order-search-input" class="custom-input search-field" placeholder="Nhập mã đơn cần tìm (ví dụ: CH00075, 340, tên khách, số ly...)" autocomplete="off">
+                    <button id="clear-order-search-btn" class="clear-btn hidden" type="button" title="Xóa tìm kiếm">
+                        <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+                    </button>
+                </div>
+                <span id="search-status-hint" class="search-hint">💡 Gõ mã hóa đơn, tên khách hoặc số ly để chọn đơn xuất Excel</span>
+
+                <!-- Search Suggestions Dropdown -->
+                <div id="order-search-dropdown" class="search-dropdown hidden"></div>
+            </div>
+
+            <!-- Selected Order Panel -->
+            <div id="selected-order-panel" class="selected-order-panel hidden animate-fade-in-up">
+                <!-- Order Top Info -->
+                <div class="sel-order-header">
+                    <div class="sel-order-badge">
+                        <span class="sel-badge-tag">HÓA ĐƠN ĐÃ CHỌN</span>
+                        <h3 id="sel-order-code">#CH00075</h3>
+                    </div>
+                    <div class="sel-order-stats">
+                        <div class="stat-pill"><i data-lucide="clock"></i> <span id="sel-order-time">14:52</span></div>
+                        <div class="stat-pill"><i data-lucide="user"></i> <span id="sel-order-cust">Khách lẻ</span></div>
+                        <div class="stat-pill highlight"><i data-lucide="coffee"></i> <span id="sel-order-cups">30 ly</span></div>
+                        <div class="stat-pill price"><i data-lucide="wallet"></i> <span id="sel-order-money">850.000đ</span></div>
+                    </div>
+                </div>
+
+                <!-- Company / Buyer Info -->
+                <div class="buyer-info-box">
+                    <div class="buyer-box-title">
+                        <i data-lucide="building-2" style="width: 16px; height: 16px; color: #0284c7;"></i>
+                        <span>Thông tin xuất hóa đơn công ty (Tùy chọn - nếu để trống sẽ tự điền mặc định)</span>
+                    </div>
+                    <div class="buyer-inputs-grid">
+                        <div class="buyer-input-group">
+                            <label>Tên người mua</label>
+                            <input type="text" id="buyer-name-input" class="custom-input" value=" bán cho người tiêu dùng" placeholder=" bán cho người tiêu dùng">
+                        </div>
+                        <div class="buyer-input-group">
+                            <label>Tên công ty / đơn vị</label>
+                            <input type="text" id="buyer-company-input" class="custom-input" placeholder="Ví dụ: Công ty TNHH ABC">
+                        </div>
+                        <div class="buyer-input-group">
+                            <label>Mã số thuế</label>
+                            <input type="text" id="buyer-taxcode-input" class="custom-input" placeholder="Ví dụ: 0312345678">
+                        </div>
+                        <div class="buyer-input-group">
+                            <label>Địa chỉ công ty</label>
+                            <input type="text" id="buyer-address-input" class="custom-input" placeholder="Ví dụ: 123 Đường ABC, Phường X, Quận Y">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Items Preview Table -->
+                <div class="sel-items-table-wrapper">
+                    <table class="sel-items-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px; text-align: center;">STT</th>
+                                <th>Tên hàng hóa / Topping</th>
+                                <th style="width: 80px; text-align: center;">ĐVT</th>
+                                <th style="width: 70px; text-align: center;">Số lượng</th>
+                                <th style="width: 120px; text-align: right;">Đơn giá</th>
+                                <th style="width: 130px; text-align: right;">Thành tiền</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sel-items-tbody"></tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" style="text-align: right; font-weight: 700;">TỔNG CỘNG HÓA ĐƠN:</td>
+                                <td id="sel-items-total-qty" style="text-align: center; font-weight: 800; color: #0284c7;">0</td>
+                                <td></td>
+                                <td id="sel-items-total-amount" style="text-align: right; font-weight: 800; color: #10b981; font-size: 15px;">0đ</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="sel-actions-bar">
+                    <button id="export-single-easyinvoice-btn" class="primary-btn export-single-btn">
+                        <i data-lucide="file-spreadsheet"></i> Xuất Excel EasyInvoice Đơn Này
+                    </button>
+                    <button id="cancel-selected-order-btn" class="secondary-btn">
+                        <i data-lucide="x"></i> Đóng / Chọn đơn khác
+                    </button>
+                </div>
+            </div>
+        </section>
+
         <!-- 📊 Section: Phân Bổ Hóa Đơn EasyInvoice (Card & Progress Bar) -->
         <section id="easyinvoice-summary-section" class="glass-card hidden">
             <!-- Section Header & Action Buttons -->

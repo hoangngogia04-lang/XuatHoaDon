@@ -38,6 +38,7 @@ const BRANCH_PRESETS = {
 let currentOrders = [];
 let filteredOrders = [];
 let expandedOrderIds = new Set();
+let selectedSingleOrder = null;
 
 // Demo Fallback Data based on User's Screenshot (PA000198, CH00067, 18/09/2026)
 const DEMO_ORDERS = [
@@ -358,6 +359,9 @@ function debouncedUpdateEasyInvoiceSummary() {
     if (exportBtn) {
         exportBtn.addEventListener('click', exportToExcel);
     }
+
+    // Initialize Single Order Search & Export Events
+    initSingleOrderEvents();
 }
 
 // In-memory Session Cache for instant branch switching
@@ -842,6 +846,11 @@ function loadOrders(orders, subtext) {
     expandedOrderIds.clear();
     
     document.getElementById('stat-orders-sub').innerText = subtext || `Cập nhật lúc ${new Date().toLocaleTimeString('vi-VN')}`;
+
+    const searchHint = document.getElementById('search-status-hint');
+    if (searchHint) {
+        searchHint.innerHTML = `💡 Sẵn sàng tìm trong <strong>${orders.length}</strong> đơn hàng hôm nay (Gõ mã đơn, số ly hoặc tên khách)`;
+    }
     
     applyFilters();
 }
@@ -1528,4 +1537,478 @@ function showToast(message, type = "success") {
         toast.style.transition = 'opacity 0.3s ease';
         setTimeout(() => toast.remove(), 300);
     }, 4000);
+}
+
+
+// ============================================================
+// 🔍 SINGLE ORDER SEARCH & INDIVIDUAL EASYINVOICE EXPORT
+// ============================================================
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function highlightSearchMatch(text, query) {
+    if (!text || !query) return escapeHtml(text || '');
+    const str = String(text);
+    const lower = str.toLowerCase();
+    const qLower = query.toLowerCase();
+    const idx = lower.indexOf(qLower);
+    if (idx === -1) return escapeHtml(str);
+    const before = escapeHtml(str.slice(0, idx));
+    const matched = escapeHtml(str.slice(idx, idx + query.length));
+    const after = escapeHtml(str.slice(idx + query.length));
+    return `${before}<mark style="background: #fef08a; color: #854d0e; padding: 0 2px; border-radius: 2px;">${matched}</mark>${after}`;
+}
+
+function getOrderItemsSummary(order) {
+    if (!order.items || order.items.length === 0) return 'Không có món';
+    const nonGift = order.items.filter(i => !i.isGift);
+    if (nonGift.length === 0) return order.items.map(i => `${i.qty}x ${i.name}`).join(', ');
+    const parts = nonGift.slice(0, 3).map(i => `${i.qty}x ${i.name.split(' (')[0].split(' (+')[0]}`);
+    if (nonGift.length > 3) parts.push(`+${nonGift.length - 3} món khác`);
+    return parts.join(' • ');
+}
+
+function initSingleOrderEvents() {
+    const searchInput = document.getElementById('order-search-input');
+    const clearBtn = document.getElementById('clear-order-search-btn');
+    const dropdown = document.getElementById('order-search-dropdown');
+    const cancelBtn = document.getElementById('cancel-selected-order-btn');
+    const exportSingleBtn = document.getElementById('export-single-easyinvoice-btn');
+
+    if (!searchInput || !dropdown) return;
+
+    let searchTimer = null;
+    searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.trim();
+        if (query) {
+            if (clearBtn) clearBtn.classList.remove('hidden');
+        } else {
+            if (clearBtn) clearBtn.classList.add('hidden');
+        }
+
+        if (searchTimer) clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            handleOrderSearchInput(query);
+        }, 120);
+    });
+
+    searchInput.addEventListener('focus', () => {
+        const query = searchInput.value.trim();
+        handleOrderSearchInput(query);
+    });
+
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const firstItem = dropdown.querySelector('.search-dropdown-item');
+            if (firstItem) {
+                const orderId = firstItem.getAttribute('data-order-id');
+                if (orderId) selectSingleOrder(orderId);
+            }
+        } else if (e.key === 'Escape') {
+            dropdown.classList.add('hidden');
+        }
+    });
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            clearBtn.classList.add('hidden');
+            dropdown.classList.add('hidden');
+            searchInput.focus();
+        });
+    }
+
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            closeSingleOrderPanel();
+        });
+    }
+
+    if (exportSingleBtn) {
+        exportSingleBtn.addEventListener('click', () => {
+            exportSingleOrderToEasyInvoice();
+        });
+    }
+
+    // Close dropdown on click outside
+    document.addEventListener('click', (e) => {
+        const searchContainer = document.querySelector('.single-order-search-container');
+        if (searchContainer && !searchContainer.contains(e.target)) {
+            dropdown.classList.add('hidden');
+        }
+    });
+}
+
+function handleOrderSearchInput(query) {
+    const dropdown = document.getElementById('order-search-dropdown');
+    if (!dropdown) return;
+
+    if (!currentOrders || currentOrders.length === 0) {
+        dropdown.innerHTML = `
+            <div class="search-dropdown-empty">
+                <i data-lucide="cloud-off" style="width: 24px; height: 24px; color: #94a3b8; margin-bottom: 6px;"></i>
+                <p>Chưa có dữ liệu đơn hàng. Vui lòng bấm <strong>"LẤY DỮ LIỆU"</strong> phía trên trước!</p>
+            </div>
+        `;
+        dropdown.classList.remove('hidden');
+        lucide.createIcons();
+        return;
+    }
+
+    const q = (query || '').toLowerCase().trim();
+
+    let matches = [];
+    if (!q) {
+        // If empty, display recent 8 orders
+        matches = currentOrders.slice(0, 8);
+    } else {
+        matches = currentOrders.filter(order => {
+            const idMatch = order.id && order.id.toLowerCase().includes(q);
+            const custMatch = order.customer && order.customer.toLowerCase().includes(q);
+            const cupsMatch = String(order.totalCups) === q || `${order.totalCups} ly`.includes(q);
+            const totalMatch = String(order.finalTotal).includes(q) || (order.finalTotal.toLocaleString('vi-VN')).includes(q);
+            const itemMatch = order.items && order.items.some(i => i.name.toLowerCase().includes(q));
+            return idMatch || custMatch || cupsMatch || totalMatch || itemMatch;
+        });
+
+        // Priority sorting: Exact ID match > startsWith ID > contains ID > other
+        matches.sort((a, b) => {
+            const aId = (a.id || '').toLowerCase();
+            const bId = (b.id || '').toLowerCase();
+            if (aId === q && bId !== q) return -1;
+            if (bId === q && aId !== q) return 1;
+            if (aId.startsWith(q) && !bId.startsWith(q)) return -1;
+            if (bId.startsWith(q) && !aId.startsWith(q)) return 1;
+            return b.totalCups - a.totalCups;
+        });
+
+        matches = matches.slice(0, 15);
+    }
+
+    if (matches.length === 0) {
+        dropdown.innerHTML = `
+            <div class="search-dropdown-empty">
+                <p>Không tìm thấy hóa đơn nào khớp với "<strong>${escapeHtml(query)}</strong>" hôm nay.</p>
+                <span style="font-size: 11.5px; color: #94a3b8;">Thử gõ số đuôi mã đơn, số ly hoặc tên khách...</span>
+            </div>
+        `;
+        dropdown.classList.remove('hidden');
+        return;
+    }
+
+    let itemsHtml = `
+        <div class="search-dropdown-header">
+            ${q ? `Tìm thấy ${matches.length} hóa đơn phù hợp` : `Danh sách hóa đơn gần đây (${matches.length})`}
+        </div>
+    `;
+
+    matches.forEach(order => {
+        const highlightedId = q ? highlightSearchMatch(order.id, q) : escapeHtml(order.id);
+        const highlightedCust = q ? highlightSearchMatch(order.customer || 'Khách lẻ', q) : escapeHtml(order.customer || 'Khách lẻ');
+        const summary = getOrderItemsSummary(order);
+
+        itemsHtml += `
+            <div class="search-dropdown-item" data-order-id="${order.id}">
+                <div class="search-item-left">
+                    <div class="search-item-top">
+                        <span class="search-order-code">#${highlightedId}</span>
+                        <span class="search-order-time">${order.datetime}</span>
+                        <span class="search-order-cust">${highlightedCust}</span>
+                    </div>
+                    <div class="search-item-preview">${escapeHtml(summary)}</div>
+                </div>
+                <div class="search-item-right">
+                    <span class="search-cups-badge">${order.totalCups} ly</span>
+                    <strong class="search-money-val">${order.finalTotal.toLocaleString('vi-VN')}đ</strong>
+                </div>
+            </div>
+        `;
+    });
+
+    dropdown.innerHTML = itemsHtml;
+    dropdown.classList.remove('hidden');
+
+    // Attach click events
+    dropdown.querySelectorAll('.search-dropdown-item').forEach(el => {
+        el.addEventListener('click', () => {
+            const orderId = el.getAttribute('data-order-id');
+            if (orderId) selectSingleOrder(orderId);
+        });
+    });
+}
+
+function selectSingleOrder(orderId) {
+    if (!currentOrders || currentOrders.length === 0) return;
+
+    const order = currentOrders.find(o => String(o.id) === String(orderId));
+    if (!order) {
+        showToast(`Không tìm thấy thông tin đơn hàng #${orderId}!`, "error");
+        return;
+    }
+
+    selectedSingleOrder = order;
+
+    // Hide dropdown
+    const dropdown = document.getElementById('order-search-dropdown');
+    if (dropdown) dropdown.classList.add('hidden');
+
+    // Update search input to order code
+    const searchInput = document.getElementById('order-search-input');
+    if (searchInput) searchInput.value = order.id;
+
+    const clearBtn = document.getElementById('clear-order-search-btn');
+    if (clearBtn) clearBtn.classList.remove('hidden');
+
+    // Populate Selected Order Details
+    const codeEl = document.getElementById('sel-order-code');
+    if (codeEl) codeEl.innerText = `#${order.id}`;
+
+    const timeEl = document.getElementById('sel-order-time');
+    if (timeEl) timeEl.innerText = order.datetime || 'Hôm nay';
+
+    const custEl = document.getElementById('sel-order-cust');
+    if (custEl) custEl.innerText = order.customer || 'Khách lẻ';
+
+    const cupsEl = document.getElementById('sel-order-cups');
+    if (cupsEl) cupsEl.innerText = `${order.totalCups} ly`;
+
+    const moneyEl = document.getElementById('sel-order-money');
+    if (moneyEl) moneyEl.innerText = `${order.finalTotal.toLocaleString('vi-VN')}đ`;
+
+    // Pre-fill Buyer / Company info
+    const buyerNameInput = document.getElementById('buyer-name-input');
+    if (buyerNameInput) {
+        if (order.customer && order.customer !== 'Khách lẻ') {
+            buyerNameInput.value = order.customer;
+        } else {
+            buyerNameInput.value = " bán cho người tiêu dùng";
+        }
+    }
+
+    // Process & group order items for display
+    const rawItems = order.items || [];
+    const validItems = rawItems.filter(item => !item.isGift && Number(item.total || 0) > 0);
+    const giftItems = rawItems.filter(item => item.isGift || Number(item.total || 0) === 0);
+
+    const groupedMap = new Map();
+    validItems.forEach(item => {
+        const itemPrice = Number(item.price || 0);
+        const key = `${item.name}|${item.unit}|${itemPrice}`;
+        if (!groupedMap.has(key)) {
+            groupedMap.set(key, { ...item, price: itemPrice, qty: Number(item.qty || 0), total: Number(item.qty || 0) * itemPrice });
+        } else {
+            const ex = groupedMap.get(key);
+            ex.qty += Number(item.qty || 0);
+            ex.total = ex.qty * ex.price;
+        }
+    });
+
+    const displayItems = Array.from(groupedMap.values());
+    displayItems.forEach(item => {
+        item.total = Number(item.qty || 0) * Number(item.price || 0);
+    });
+
+    let tbodyHtml = '';
+    let totalQty = 0;
+    let totalAmount = 0;
+
+    displayItems.forEach((item, idx) => {
+        totalQty += item.qty;
+        totalAmount += item.total;
+        tbodyHtml += `
+            <tr>
+                <td style="text-align: center; color: #64748b;">${idx + 1}</td>
+                <td><strong>${escapeHtml(item.name)}</strong></td>
+                <td style="text-align: center;"><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-size: 11px;">${escapeHtml(item.unit || 'Ly')}</span></td>
+                <td style="text-align: center; font-weight: 700; color: #0284c7;">${item.qty}</td>
+                <td style="text-align: right;">${item.price.toLocaleString('vi-VN')}đ</td>
+                <td style="text-align: right; font-weight: 700; color: #059669;">${item.total.toLocaleString('vi-VN')}đ</td>
+            </tr>
+        `;
+    });
+
+    giftItems.forEach(gift => {
+        tbodyHtml += `
+            <tr style="background: #fffbeb;">
+                <td style="text-align: center; color: #b45309;">🎁</td>
+                <td><strong>${escapeHtml(gift.name)}</strong> <span class="gift-tag">Quà tặng POS (Không xuất thuế)</span></td>
+                <td style="text-align: center;"><span style="background: #fef3c7; color: #b45309; padding: 2px 8px; border-radius: 4px; font-size: 11px;">${escapeHtml(gift.unit || 'cái')}</span></td>
+                <td style="text-align: center; font-weight: 600; color: #b45309;">${gift.qty}</td>
+                <td style="text-align: right; color: #b45309;">0đ</td>
+                <td style="text-align: right; font-weight: 600; color: #b45309;">0đ</td>
+            </tr>
+        `;
+    });
+
+    const tbody = document.getElementById('sel-items-tbody');
+    if (tbody) tbody.innerHTML = tbodyHtml;
+
+    const totalQtyEl = document.getElementById('sel-items-total-qty');
+    if (totalQtyEl) totalQtyEl.innerText = totalQty;
+
+    const totalAmountEl = document.getElementById('sel-items-total-amount');
+    if (totalAmountEl) totalAmountEl.innerText = `${totalAmount.toLocaleString('vi-VN')}đ`;
+
+    // Show Panel
+    const panel = document.getElementById('selected-order-panel');
+    if (panel) {
+        panel.classList.remove('hidden');
+        panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    lucide.createIcons();
+}
+
+function closeSingleOrderPanel() {
+    selectedSingleOrder = null;
+    const panel = document.getElementById('selected-order-panel');
+    if (panel) panel.classList.add('hidden');
+    const searchInput = document.getElementById('order-search-input');
+    if (searchInput) searchInput.value = '';
+    const clearBtn = document.getElementById('clear-order-search-btn');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    const dropdown = document.getElementById('order-search-dropdown');
+    if (dropdown) dropdown.classList.add('hidden');
+}
+
+function exportSingleOrderToEasyInvoice() {
+    try {
+        if (!selectedSingleOrder) {
+            showToast("Vui lòng tìm và chọn một hóa đơn cần xuất!", "error");
+            return;
+        }
+
+        const buyerNameInput = document.getElementById('buyer-name-input');
+        const buyerCompanyInput = document.getElementById('buyer-company-input');
+        const buyerTaxcodeInput = document.getElementById('buyer-taxcode-input');
+        const buyerAddressInput = document.getElementById('buyer-address-input');
+
+        const tenNguoiMua = buyerNameInput?.value.trim() || " bán cho người tiêu dùng";
+        const tenDonVi = buyerCompanyInput?.value.trim() || "";
+        const maSoThue = buyerTaxcodeInput?.value.trim() || "";
+        const diaChiKhachHang = buyerAddressInput?.value.trim() || "";
+
+        // Process order items
+        const rawItems = selectedSingleOrder.items || [];
+        const validItems = rawItems.filter(item => !item.isGift && Number(item.total || 0) > 0);
+
+        if (validItems.length === 0) {
+            showToast("Đơn hàng này không có sản phẩm tính phí hợp lệ để xuất hóa đơn!", "error");
+            return;
+        }
+
+        // Group identical items together by (name + unit + price)
+        const groupedMap = new Map();
+        validItems.forEach(item => {
+            const itemPrice = Number(item.price || 0);
+            const key = `${item.name}|${item.unit}|${itemPrice}`;
+            if (!groupedMap.has(key)) {
+                groupedMap.set(key, { ...item, price: itemPrice, qty: Number(item.qty || 0), total: Number(item.qty || 0) * itemPrice });
+            } else {
+                const ex = groupedMap.get(key);
+                ex.qty += Number(item.qty || 0);
+                ex.total = ex.qty * ex.price;
+            }
+        });
+        const groupedItems = Array.from(groupedMap.values());
+        // Bảo đảm 100% toán học: Thành tiền = Số lượng * Đơn giá cho từng dòng
+        groupedItems.forEach(item => {
+            item.total = Number(item.qty || 0) * Number(item.price || 0);
+        });
+
+        // Date formatting: DD/MM/YYYY
+        let formattedDate = "";
+        const dateInputVal = document.getElementById('date-input')?.value;
+        if (selectedSingleOrder.datetime && selectedSingleOrder.datetime.includes('/')) {
+            const datePart = selectedSingleOrder.datetime.split(' ')[0];
+            formattedDate = datePart; // Already DD/MM/YYYY
+        } else if (dateInputVal && dateInputVal.includes('-')) {
+            const parts = dateInputVal.split('-');
+            if (parts.length === 3) formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+        if (!formattedDate) {
+            const now = new Date();
+            formattedDate = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+        }
+
+        // Build 43-column rows strictly matching EasyInvoice standard template
+        const exportRows = groupedItems.map((item, idx) => {
+            const itemQty = Number(item.qty || 0);
+            const itemPrice = Number(item.price || 0);
+            const itemTotal = itemQty * itemPrice;
+
+            return {
+                "MaHD": "HD1",
+                "NgayHoaDon": formattedDate,
+                "MaKhachHang": "",
+                "TenNguoiMua": tenNguoiMua,
+                "TenDonVi": tenDonVi,
+                "MaSoThue": maSoThue,
+                "DiaChiKhachHang": diaChiKhachHang,
+                "SoDienThoai": "",
+                "SoBangKe": "",
+                "NgayBangKe": "",
+                "SOTKKHACH": "",
+                "TENNHKHACH": "",
+                "HinhThucThanhToan": "Tiền mặt /Chuyển khoản",
+                "ThueSuat": "-1",
+                "ThueSuatKhac": "",
+                "MaHang": "",
+                "TenHangHoa": item.name,
+                "DVT": item.isTopping ? "phần" : (item.unit && (item.unit.includes("1000cc") || item.unit.includes("Lớn")) ? "Ly" : "Ly"),
+                "SoLuong": itemQty,
+                "DonGia": itemPrice,
+                "ThanhTien": itemTotal,
+                "TienTe": "VND",
+                "SoTT": idx + 1,
+                "TinhChat": "1",
+                "Email": "",
+                "Ghichu": `Đơn hàng POS #${selectedSingleOrder.id}`,
+                "TyGia": "",
+                "GiamTruHoaDon": "",
+                "GiamTruTungDongHangHoa": "",
+                "TienGiamTru": "",
+                "TyLe%ChietKhau": "",
+                "TienChietKhau": "",
+                "TienThue": "",
+                "MaDonViQuanHeNganSach": "",
+                "CanCuocCongDan": "",
+                "SoHoChieu": "",
+                "SoKhung": "",
+                "SoMay": "",
+                "BienKiemSoatPhuongTienVanchuyen": "",
+                "TenNguoiGuiHang": "",
+                "DiaChiNguoiGuiHang": "",
+                "MaSoThueNguoiGuiHang": "",
+                "SoDinhDanhNguoiGuiHang": ""
+            };
+        });
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(exportRows);
+        XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+
+        const branchSelectEl = document.getElementById('branch-select');
+        const branchKey = branchSelectEl ? branchSelectEl.value : 'xuanloc';
+        const branchPrefix = (branchKey !== 'custom' && BRANCH_PRESETS[branchKey]) ? (BRANCH_PRESETS[branchKey].exportPrefix || "PosApp") : "PosApp";
+
+        // Date for filename
+        let dateFilename = formattedDate.replace(/\//g, '-');
+        const filename = `${branchPrefix}_${selectedSingleOrder.id}_${dateFilename}.xlsx`;
+
+        downloadExcelWorkbook(wb, filename);
+
+        showToast(`Đã xuất thành công hóa đơn #${selectedSingleOrder.id} (${selectedSingleOrder.totalCups} ly - ${selectedSingleOrder.finalTotal.toLocaleString('vi-VN')}đ)!`, "success");
+    } catch (err) {
+        console.error("Lỗi xuất hóa đơn đơn lẻ:", err);
+        showToast("Lỗi khi xuất hóa đơn đơn lẻ: " + err.message, "error");
+    }
 }
