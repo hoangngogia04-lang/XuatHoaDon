@@ -47,12 +47,12 @@
                     <input type="date" id="date-input" class="custom-input">
                 </div>
 
-                <div class="control-group">
+                <div class="control-group daily-only-control">
                     <label>Số HĐ</label>
                     <input type="number" id="num-invoices-input" class="custom-input" placeholder="Tự động" min="1" max="50" style="width: 80px;">
                 </div>
 
-                <div class="control-group">
+                <div class="control-group daily-only-control">
                     <label>Dòng/HĐ</label>
                     <input type="number" id="target-lines-input" class="custom-input" value="30" min="10" max="100" style="width: 80px;">
                 </div>
@@ -75,7 +75,30 @@
             </div>
         </div>
 
-        <!-- 🧮 Section: Điều Chỉnh Doanh Thu (Doanh Thu Thực Tế Nổi Bật) -->
+        
+        <!-- 🗂️ Main Navigation Tabs -->
+        <div class="tabs-nav-wrapper">
+            <div class="main-tabs-nav">
+                <button id="tab-btn-daily" class="main-tab-btn active" data-tab="tab-daily" type="button">
+                    <i data-lucide="calendar-range"></i>
+                    <div class="tab-btn-content">
+                        <span class="tab-title">Xuất Tổng Hợp Theo Ngày</span>
+                        <span class="tab-sub">Phân bổ hóa đơn tự động</span>
+                    </div>
+                </button>
+                <button id="tab-btn-single" class="main-tab-btn" data-tab="tab-single" type="button">
+                    <i data-lucide="receipt"></i>
+                    <div class="tab-btn-content">
+                        <span class="tab-title">Xuất Theo Từng Hóa Đơn</span>
+                        <span class="tab-sub" id="tab-single-badge">Đơn lẻ &amp; Tra MST</span>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- ================= TAB 1: XUẤT THEO NGÀY (PHÂN BỔ TỰ ĐỘNG) ================= -->
+        <div id="tab-daily-pane" class="tab-pane active">
+<!-- 🧮 Section: Điều Chỉnh Doanh Thu (Doanh Thu Thực Tế Nổi Bật) -->
         <section class="glass-card deduction-section">
             <div class="deduction-container">
                 <div class="deduction-left">
@@ -133,7 +156,57 @@
             </div>
         </section>
 
-        <!-- 🔍 Section: Xuất Hóa Đơn Riêng Theo Mã Đơn (Công Ty / Đơn Lẻ) -->
+        <!-- 📊 Section: Phân Bổ Hóa Đơn EasyInvoice (Card & Progress Bar) -->
+        <section id="easyinvoice-summary-section" class="glass-card hidden">
+            <!-- Section Header & Action Buttons -->
+            <div class="summary-header">
+                <div class="summary-title">
+                    <i data-lucide="bar-chart-3" style="color: #60a5fa; width: 22px; height: 22px;"></i>
+                    <h3>📊 PHÂN BỔ HÓA ĐƠN</h3>
+                </div>
+                <div class="summary-actions">
+                    <button id="export-easyinvoice-btn" class="primary-btn">
+                        <i data-lucide="file-spreadsheet"></i> Xuất EasyInvoice (Excel)
+                    </button>
+                    <button id="export-excel-btn" class="secondary-btn">
+                        <i data-lucide="download"></i> Báo Cáo Nội Bộ
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tier 1: Summary Bar -->
+            <div class="distribution-meta-bar">
+                <div class="meta-item">
+                    <span>HÓA ĐƠN</span>
+                    <strong id="easy-stat-hd-count">0</strong>
+                </div>
+                <div class="meta-item">
+                    <span>SỐ DÒNG</span>
+                    <strong id="easy-stat-lines-count">0</strong>
+                </div>
+                <div class="meta-item">
+                    <span>SỐ LY</span>
+                    <strong id="easy-stat-cups-count">0 ly</strong>
+                </div>
+                <div class="meta-item highlight">
+                    <span>DOANH THU THỰC TẾ</span>
+                    <strong id="easy-stat-revenue" style="color: #10b981;">0đ</strong>
+                </div>
+                <span id="easyinvoice-summary-meta" class="meta-tag">0 HĐ</span>
+            </div>
+
+            <!-- Tier 2: Interactive HD Cards Grid -->
+            <div class="hd-grid-container">
+                <div id="easyinvoice-pills-container" class="hd-grid">
+                    <!-- Dynamic HD Cards rendered by app.js -->
+                </div>
+            </div>
+        </section>
+        </div><!-- /#tab-daily-pane -->
+
+        <!-- ================= TAB 2: XUẤT THEO TỪNG HÓA ĐƠN ================= -->
+        <div id="tab-single-pane" class="tab-pane hidden">
+            <!-- 🔍 Section: Xuất Hóa Đơn Riêng Theo Mã Đơn (Công Ty / Đơn Lẻ) -->
         <section class="glass-card single-order-section">
             <div class="single-order-header">
                 <div class="section-badge-title">
@@ -158,7 +231,41 @@
                 <div id="order-search-dropdown" class="search-dropdown hidden"></div>
             </div>
 
-            <!-- Selected Order Panel -->
+            
+                <!-- Empty State before Fetching -->
+                <div id="single-orders-empty-state" class="single-orders-empty-state">
+                    <div class="empty-state-icon">☕</div>
+                    <h5>Chưa tải dữ liệu đơn hàng</h5>
+                    <p>Vui lòng chọn <strong>Chi nhánh</strong> & <strong>Ngày báo cáo</strong> ở trên, sau đó nhấn nút <strong>LẤY DỮ LIỆU</strong> để tra cứu đơn.</p>
+                </div>
+
+                <!-- Orders List Table (When no order is selected) -->
+                <div id="single-orders-list-wrapper" class="single-orders-list-wrapper hidden">
+                    <div class="orders-list-header">
+                        <div class="list-header-left">
+                            <i data-lucide="list-ordered" style="width: 16px; height: 16px; color: #0284c7;"></i>
+                            <h5>Danh sách hóa đơn hôm nay (<span id="single-orders-count">0</span> đơn)</h5>
+                        </div>
+                        <span class="orders-list-sub">Bấm nút "Chọn xuất HĐ" hoặc tìm kiếm mã đơn ở trên</span>
+                    </div>
+                    <div class="orders-table-scroll">
+                        <table class="orders-mini-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 75px;">Giờ</th>
+                                    <th style="width: 110px;">Mã đơn</th>
+                                    <th>Khách hàng</th>
+                                    <th style="width: 75px; text-align: center;">Số ly</th>
+                                    <th style="width: 125px; text-align: right;">Tổng tiền</th>
+                                    <th style="width: 115px; text-align: center;">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="single-orders-table-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Selected Order Panel -->
             <div id="selected-order-panel" class="selected-order-panel hidden animate-fade-in-up">
                 <!-- Order Top Info -->
                 <div class="sel-order-header">
@@ -251,53 +358,8 @@
                 </div>
             </div>
         </section>
+        </div><!-- /#tab-single-pane -->
 
-        <!-- 📊 Section: Phân Bổ Hóa Đơn EasyInvoice (Card & Progress Bar) -->
-        <section id="easyinvoice-summary-section" class="glass-card hidden">
-            <!-- Section Header & Action Buttons -->
-            <div class="summary-header">
-                <div class="summary-title">
-                    <i data-lucide="bar-chart-3" style="color: #60a5fa; width: 22px; height: 22px;"></i>
-                    <h3>📊 PHÂN BỔ HÓA ĐƠN</h3>
-                </div>
-                <div class="summary-actions">
-                    <button id="export-easyinvoice-btn" class="primary-btn">
-                        <i data-lucide="file-spreadsheet"></i> Xuất EasyInvoice (Excel)
-                    </button>
-                    <button id="export-excel-btn" class="secondary-btn">
-                        <i data-lucide="download"></i> Báo Cáo Nội Bộ
-                    </button>
-                </div>
-            </div>
-
-            <!-- Tier 1: Summary Bar -->
-            <div class="distribution-meta-bar">
-                <div class="meta-item">
-                    <span>HÓA ĐƠN</span>
-                    <strong id="easy-stat-hd-count">0</strong>
-                </div>
-                <div class="meta-item">
-                    <span>SỐ DÒNG</span>
-                    <strong id="easy-stat-lines-count">0</strong>
-                </div>
-                <div class="meta-item">
-                    <span>SỐ LY</span>
-                    <strong id="easy-stat-cups-count">0 ly</strong>
-                </div>
-                <div class="meta-item highlight">
-                    <span>DOANH THU THỰC TẾ</span>
-                    <strong id="easy-stat-revenue" style="color: #10b981;">0đ</strong>
-                </div>
-                <span id="easyinvoice-summary-meta" class="meta-tag">0 HĐ</span>
-            </div>
-
-            <!-- Tier 2: Interactive HD Cards Grid -->
-            <div class="hd-grid-container">
-                <div id="easyinvoice-pills-container" class="hd-grid">
-                    <!-- Dynamic HD Cards rendered by app.js -->
-                </div>
-            </div>
-        </section>
     </div>
 
     <!-- Toast Notification Container -->

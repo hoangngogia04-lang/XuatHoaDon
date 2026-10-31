@@ -362,6 +362,7 @@ function debouncedUpdateEasyInvoiceSummary() {
 
     // Initialize Single Order Search & Export Events
     initSingleOrderEvents();
+    initTabs();
 }
 
 // In-memory Session Cache for instant branch switching
@@ -852,6 +853,10 @@ function loadOrders(orders, subtext) {
     const searchHint = document.getElementById('search-status-hint');
     if (searchHint) {
         searchHint.innerHTML = `💡 Sẵn sàng tìm trong <strong>${orders.length}</strong> đơn hàng hôm nay (Gõ mã đơn, số ly hoặc tên khách)`;
+    }
+    // Update Single Orders Table & Tab Badge
+    if (typeof renderSingleOrdersTable === 'function') {
+        renderSingleOrdersTable(orders);
     }
     
     applyFilters();
@@ -1768,6 +1773,12 @@ function handleOrderSearchInput(query) {
     dropdown.innerHTML = itemsHtml;
     dropdown.classList.remove('hidden');
 
+    // Also filter orders table in Tab 2 if list is rendered
+    if (typeof renderSingleOrdersTable === 'function') {
+        renderSingleOrdersTable(matches);
+    }
+
+
     // Attach click events
     dropdown.querySelectorAll('.search-dropdown-item').forEach(el => {
         el.addEventListener('click', () => {
@@ -1899,7 +1910,9 @@ function selectSingleOrder(orderId) {
     const totalAmountEl = document.getElementById('sel-items-total-amount');
     if (totalAmountEl) totalAmountEl.innerText = `${totalAmount.toLocaleString('vi-VN')}đ`;
 
-    // Show Panel
+    // Hide list table & Show Selected Order Panel
+    const listWrapper = document.getElementById('single-orders-list-wrapper');
+    if (listWrapper) listWrapper.classList.add('hidden');
     const panel = document.getElementById('selected-order-panel');
     if (panel) {
         panel.classList.remove('hidden');
@@ -1913,6 +1926,9 @@ function closeSingleOrderPanel() {
     selectedSingleOrder = null;
     const panel = document.getElementById('selected-order-panel');
     if (panel) panel.classList.add('hidden');
+    const listWrapper = document.getElementById('single-orders-list-wrapper');
+    if (listWrapper && currentOrders && currentOrders.length > 0) listWrapper.classList.remove('hidden');
+    if (typeof renderSingleOrdersTable === 'function') renderSingleOrdersTable(currentOrders);
     const searchInput = document.getElementById('order-search-input');
     if (searchInput) searchInput.value = '';
     const clearBtn = document.getElementById('clear-order-search-btn');
@@ -2135,3 +2151,132 @@ async function performTaxLookup(taxCode) {
         lucide.createIcons();
     }
 }
+
+
+// ============================================================
+// 🗂️ TAB SWITCHING & SINGLE ORDERS TABLE
+// ============================================================
+
+function switchMainTab(tabName) {
+    const dailyBtn = document.getElementById('tab-btn-daily');
+    const singleBtn = document.getElementById('tab-btn-single');
+    const dailyPane = document.getElementById('tab-daily-pane');
+    const singlePane = document.getElementById('tab-single-pane');
+
+    if (tabName === 'tab-single') {
+        dailyBtn?.classList.remove('active');
+        singleBtn?.classList.add('active');
+        dailyPane?.classList.add('hidden');
+        singlePane?.classList.remove('hidden');
+        document.body.classList.add('tab-single-active');
+        
+        // Refresh single orders view
+        renderSingleOrdersTable();
+    } else {
+        singleBtn?.classList.remove('active');
+        dailyBtn?.classList.add('active');
+        singlePane?.classList.add('hidden');
+        dailyPane?.classList.remove('hidden');
+        document.body.classList.remove('tab-single-active');
+    }
+
+    try {
+        localStorage.setItem('active_posapp_tab', tabName);
+    } catch (e) {}
+
+    lucide.createIcons();
+}
+
+function initTabs() {
+    const dailyBtn = document.getElementById('tab-btn-daily');
+    const singleBtn = document.getElementById('tab-btn-single');
+
+    if (dailyBtn) {
+        dailyBtn.addEventListener('click', () => switchMainTab('tab-daily'));
+    }
+    if (singleBtn) {
+        singleBtn.addEventListener('click', () => switchMainTab('tab-single'));
+    }
+
+    // Restore saved tab if available
+    try {
+        const savedTab = localStorage.getItem('active_posapp_tab');
+        if (savedTab === 'tab-single') {
+            switchMainTab('tab-single');
+        }
+    } catch (e) {}
+}
+
+function renderSingleOrdersTable(ordersToDisplay) {
+    const tbody = document.getElementById('single-orders-table-tbody');
+    const countEl = document.getElementById('single-orders-count');
+    const badgeEl = document.getElementById('tab-single-badge');
+    const emptyState = document.getElementById('single-orders-empty-state');
+    const listWrapper = document.getElementById('single-orders-list-wrapper');
+
+    const orders = ordersToDisplay || currentOrders || [];
+
+    if (badgeEl) {
+        badgeEl.innerText = orders.length > 0 ? `${orders.length} đơn` : 'Đơn lẻ & Tra MST';
+    }
+    if (countEl) {
+        countEl.innerText = orders.length;
+    }
+
+    if (!currentOrders || currentOrders.length === 0) {
+        if (emptyState) emptyState.classList.remove('hidden');
+        if (listWrapper) listWrapper.classList.add('hidden');
+        if (tbody) tbody.innerHTML = '';
+        return;
+    }
+
+    if (emptyState) emptyState.classList.add('hidden');
+    // If an order is currently selected, keep listWrapper hidden until closed
+    if (selectedSingleOrder) {
+        if (listWrapper) listWrapper.classList.add('hidden');
+        return;
+    } else {
+        if (listWrapper) listWrapper.classList.remove('hidden');
+    }
+
+    if (!tbody) return;
+
+    if (orders.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">Không tìm thấy đơn hàng nào khớp với từ khóa tìm kiếm.</td></tr>`;
+        return;
+    }
+
+    let rowsHtml = '';
+    orders.forEach((o) => {
+        let timeStr = '--:--';
+        if (o.datetime) {
+            timeStr = o.datetime.includes(' ') ? o.datetime.split(' ')[1] : o.datetime;
+        }
+        rowsHtml += `
+            <tr class="order-table-row" data-order-id="${escapeHtml(o.id)}">
+                <td style="color: #64748b; font-size: 12px; font-weight: 500;">${timeStr}</td>
+                <td><strong class="order-code-badge">#${escapeHtml(o.id)}</strong></td>
+                <td><span style="font-weight: 500;">${escapeHtml(o.customer || 'Khách lẻ')}</span></td>
+                <td style="text-align: center;"><span class="cups-pill">${o.totalCups || 0} ly</span></td>
+                <td style="text-align: right; font-weight: 700; color: #0284c7;">${(o.finalTotal || 0).toLocaleString('vi-VN')}đ</td>
+                <td style="text-align: center;">
+                    <button type="button" class="select-order-btn" data-order-id="${escapeHtml(o.id)}" onclick="selectSingleOrder('${escapeHtml(o.id)}')">
+                        <i data-lucide="check" style="width: 12px; height: 12px;"></i> Chọn xuất HĐ
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = rowsHtml;
+    tbody.querySelectorAll('.select-order-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const orderId = e.currentTarget.getAttribute('data-order-id');
+            if (orderId) selectSingleOrder(orderId);
+        });
+    });
+    lucide.createIcons();
+}
+
+window.selectSingleOrder = selectSingleOrder;
+window.switchMainTab = switchMainTab;
