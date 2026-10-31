@@ -622,11 +622,12 @@ function parsePosAppOrdersJson(resData, branchName) {
                     name: pName,
                     unit: unit,
                     qty: qty,
-                    price: price,
+                    price: baseFinalPrice,
+                    originalPrice: price,
                     discount: discPrice,
                     surcharge: parseFloat(prod.surcharge_price || prod.surcharge || 0),
                     finalPrice: baseFinalPrice,
-                    total: qty * price,
+                    total: qty * baseFinalPrice,
                     isTopping: true
                 });
             } else {
@@ -652,11 +653,12 @@ function parsePosAppOrdersJson(resData, branchName) {
                     name: mergedItemName,
                     unit: unit,
                     qty: qty,
-                    price: fullUnitPrice,
+                    price: finalUnitPrice,
+                    originalPrice: fullUnitPrice,
                     discount: discPrice,
                     surcharge: parseFloat(prod.surcharge_price || prod.surcharge || 0),
                     finalPrice: finalUnitPrice,
-                    total: qty * fullUnitPrice,
+                    total: qty * finalUnitPrice,
                     isTopping: false
                 });
             }
@@ -1823,13 +1825,20 @@ function selectSingleOrder(orderId) {
     displayItems.forEach((item, idx) => {
         totalQty += item.qty;
         totalAmount += item.total;
+
+        let discountBadge = '';
+        if (item.originalPrice && item.originalPrice > item.price) {
+            const discPerCup = item.originalPrice - item.price;
+            discountBadge = `<span style="font-size: 11px; color: #ef4444; font-weight: 600; display: block;">(-${discPerCup.toLocaleString('vi-VN')}đ VIP)</span>`;
+        }
+
         tbodyHtml += `
             <tr>
                 <td style="text-align: center; color: #64748b;">${idx + 1}</td>
                 <td><strong>${escapeHtml(item.name)}</strong></td>
                 <td style="text-align: center;"><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-size: 11px;">${escapeHtml(item.unit || 'Ly')}</span></td>
                 <td style="text-align: center; font-weight: 700; color: #0284c7;">${item.qty}</td>
-                <td style="text-align: right;">${item.price.toLocaleString('vi-VN')}đ</td>
+                <td style="text-align: right;">${item.price.toLocaleString('vi-VN')}đ ${discountBadge}</td>
                 <td style="text-align: right; font-weight: 700; color: #059669;">${item.total.toLocaleString('vi-VN')}đ</td>
             </tr>
         `;
