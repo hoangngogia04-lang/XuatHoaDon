@@ -186,17 +186,32 @@
                             <input type="text" id="buyer-name-input" class="custom-input" value=" bán cho người tiêu dùng" placeholder=" bán cho người tiêu dùng">
                         </div>
                         <div class="buyer-input-group">
-                            <label>Tên công ty / đơn vị</label>
-                            <input type="text" id="buyer-company-input" class="custom-input" placeholder="Ví dụ: Công ty TNHH ABC">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label>Mã số thuế</label>
+                                <span id="tax-lookup-status" class="hidden" style="font-size: 11px; color: #0284c7; font-weight: 600;">
+                                    <i data-lucide="loader-2" class="animate-spin" style="width: 12px; height: 12px; display: inline-block;"></i> Đang tra...
+                                </span>
+                            </div>
+                            <div style="position: relative; display: flex; align-items: center;">
+                                <input type="text" id="buyer-taxcode-input" class="custom-input" placeholder="Ví dụ: 0300588569" style="width: 100%; padding-right: 86px;">
+                                <button id="lookup-tax-btn" type="button" class="tax-lookup-btn" title="Tra cứu thông tin công ty từ Mã số thuế">
+                                    <i data-lucide="search" style="width: 12px; height: 12px;"></i> Tra MST
+                                </button>
+                            </div>
                         </div>
                         <div class="buyer-input-group">
-                            <label>Mã số thuế</label>
-                            <input type="text" id="buyer-taxcode-input" class="custom-input" placeholder="Ví dụ: 0312345678">
+                            <label>Tên công ty / đơn vị</label>
+                            <input type="text" id="buyer-company-input" class="custom-input" placeholder="Ví dụ: Công ty TNHH ABC">
                         </div>
                         <div class="buyer-input-group">
                             <label>Địa chỉ công ty</label>
                             <input type="text" id="buyer-address-input" class="custom-input" placeholder="Ví dụ: 123 Đường ABC, Phường X, Quận Y">
                         </div>
+                    </div>
+                    <!-- Disclaimer requested by user -->
+                    <div class="buyer-disclaimer-note">
+                        <i data-lucide="alert-triangle" style="width: 15px; height: 15px; flex-shrink: 0; color: #d97706;"></i>
+                        <span><strong>Lưu ý:</strong> Thông tin công ty được tự động nhập có thể có sai lệch. Vui lòng kiểm tra lại trước khi lưu!</span>
                     </div>
                 </div>
 

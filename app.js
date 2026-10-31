@@ -1640,6 +1640,36 @@ function initSingleOrderEvents() {
         });
     }
 
+    // Tax Code (MST) Auto Lookup Events
+    const taxInput = document.getElementById('buyer-taxcode-input');
+    const taxBtn = document.getElementById('lookup-tax-btn');
+
+    if (taxInput) {
+        taxInput.addEventListener('input', (e) => {
+            const val = e.target.value.trim().replace(/\s+/g, '');
+            // Auto trigger lookup when user inputs 10 or 13-14 chars
+            if (val.length === 10 || val.length === 13 || val.length === 14) {
+                if (taxLookupTimer) clearTimeout(taxLookupTimer);
+                taxLookupTimer = setTimeout(() => {
+                    performTaxLookup(val);
+                }, 400);
+            }
+        });
+
+        taxInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                performTaxLookup(taxInput.value);
+            }
+        });
+    }
+
+    if (taxBtn) {
+        taxBtn.addEventListener('click', () => {
+            if (taxInput) performTaxLookup(taxInput.value);
+        });
+    }
+
     // Close dropdown on click outside
     document.addEventListener('click', (e) => {
         const searchContainer = document.querySelector('.single-order-search-container');
@@ -2022,5 +2052,86 @@ function exportSingleOrderToEasyInvoice() {
     } catch (err) {
         console.error("Lỗi xuất hóa đơn đơn lẻ:", err);
         showToast("Lỗi khi xuất hóa đơn đơn lẻ: " + err.message, "error");
+    }
+}
+
+
+// ============================================================
+// 🏢 TAX CODE (MST) LOOKUP API
+// ============================================================
+
+let taxLookupTimer = null;
+
+async function performTaxLookup(taxCode) {
+    if (!taxCode) {
+        showToast("Vui lòng nhập Mã số thuế cần tra cứu!", "error");
+        return;
+    }
+    const cleanCode = taxCode.trim().replace(/\s+/g, '');
+    if (cleanCode.length < 10) {
+        showToast("Mã số thuế thường có từ 10 đến 14 chữ số!", "error");
+        return;
+    }
+
+    const statusEl = document.getElementById('tax-lookup-status');
+    const lookupBtn = document.getElementById('lookup-tax-btn');
+    const companyInput = document.getElementById('buyer-company-input');
+    const addressInput = document.getElementById('buyer-address-input');
+
+    if (statusEl) statusEl.classList.remove('hidden');
+    if (lookupBtn) lookupBtn.disabled = true;
+
+    try {
+        let resData = null;
+
+        // 1. Direct call to VietQR public business API (CORS enabled)
+        try {
+            const directUrl = `https://api.vietqr.io/v2/business/${encodeURIComponent(cleanCode)}`;
+            const directRes = await fetch(directUrl);
+            if (directRes.ok) {
+                resData = await directRes.json();
+            }
+        } catch (netErr) {
+            console.warn("Direct VietQR lookup failed, falling back to server proxy...", netErr);
+        }
+
+        // 2. Fallback to server proxy if direct call failed
+        if (!resData || resData.code !== "00") {
+            const baseUrl = (window.location.protocol === 'file:') ? 'http://localhost:3000' : '';
+            const proxyUrl = `${baseUrl}/api/posapp?action=lookupTaxCode&taxCode=${encodeURIComponent(cleanCode)}`;
+            const proxyRes = await fetch(proxyUrl);
+            if (proxyRes.ok) {
+                resData = await proxyRes.json();
+            }
+        }
+
+        if (resData && (resData.code === "00" || resData.data)) {
+            const bData = resData.data || {};
+            const compName = bData.name || bData.shortName || "";
+            const compAddress = bData.address || "";
+
+            if (compName && companyInput) {
+                companyInput.value = compName;
+            }
+            if (compAddress && addressInput) {
+                addressInput.value = compAddress;
+            }
+
+            if (compName) {
+                showToast(`Đã tìm thấy: ${compName}`, "success");
+            } else {
+                showToast("Đã tra cứu mã số thuế nhưng không có dữ liệu tên công ty!", "error");
+            }
+        } else {
+            const errMsg = (resData && resData.desc) ? resData.desc : "Không tìm thấy thông tin công ty từ mã số thuế này!";
+            showToast(errMsg, "error");
+        }
+    } catch (err) {
+        console.error("Lỗi tra cứu MST:", err);
+        showToast("Không thể kết nối đến máy chủ tra cứu thuế. Bạn có thể tự gõ tay nhé!", "error");
+    } finally {
+        if (statusEl) statusEl.classList.add('hidden');
+        if (lookupBtn) lookupBtn.disabled = false;
+        lucide.createIcons();
     }
 }

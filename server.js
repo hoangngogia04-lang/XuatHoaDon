@@ -32,6 +32,28 @@ const server = http.createServer(async (req, res) => {
     // API Proxy handler for /api/posapp
     if (reqUrl.pathname.startsWith('/api/posapp')) {
         const action = reqUrl.searchParams.get('action');
+        const taxCode = reqUrl.searchParams.get('taxCode');
+
+        // Handle Tax Code Lookup proxy
+        if (action === 'lookupTaxCode') {
+            if (!taxCode) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Missing taxCode' }));
+                return;
+            }
+            try {
+                const cleanCode = String(taxCode).trim().replace(/\s+/g, '');
+                const taxRes = await fetch(`https://api.vietqr.io/v2/business/${encodeURIComponent(cleanCode)}`);
+                const taxText = await taxRes.text();
+                res.writeHead(taxRes.status, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(taxText);
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+            return;
+        }
+
         const shopId = reqUrl.searchParams.get('shopId');
         const posAppToken = reqUrl.searchParams.get('posAppToken');
         const date = reqUrl.searchParams.get('date') || new Date().toISOString().split('T')[0];

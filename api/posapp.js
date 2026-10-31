@@ -14,7 +14,19 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const { action, shopId, posAppToken, date } = req.query;
+    const { action, shopId, posAppToken, date, taxCode } = req.query;
+
+    // Handle Tax Code Lookup (Tra cứu MST doanh nghiệp Việt Nam)
+    if (action === 'lookupTaxCode') {
+      if (!taxCode) {
+        return res.status(400).json({ error: 'Missing taxCode' });
+      }
+      const cleanCode = String(taxCode).trim().replace(/\s+/g, '');
+      const taxResponse = await fetch(`https://api.vietqr.io/v2/business/${encodeURIComponent(cleanCode)}`);
+      const taxData = await taxResponse.json();
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      return res.status(taxResponse.status).json(taxData);
+    }
 
     if (!shopId || !posAppToken) {
       return res.status(400).json({ error: 'Missing shopId or posAppToken' });
