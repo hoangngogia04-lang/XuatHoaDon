@@ -554,23 +554,23 @@ function parsePosAppOrdersJson(resData, branchName) {
 
             if (isMainZeroSugarIce) return;
 
-            // Auto-detect Promotional Gifts / Non-Beverage Merchandise (Lồng Đèn, Bình Nước, Túi, Gấu Bông, Quà Tặng, 9.999.999đ...)
+            // Auto-detect Non-Beverage Merchandise Gifts (Lồng Đèn DIY, Bình Nước, Túi Vải, Gấu Bông, Móc Khóa, 9.999.999đ...)
             const isGiftUnit = unitLower.includes('cái') || unitLower.includes('chiếc') || unitLower.includes('quà') || 
                                unitLower.includes('hộp') || unitLower.includes('bình') || unitLower.includes('túi') || 
                                unitLower.includes('gấu') || unitLower.includes('vé') || unitLower.includes('bộ');
 
-            const isGiftName = pNameLower.includes('tặng') || pNameLower.includes('quà') || pNameLower.includes('lồng đèn') || 
-                               pNameLower.includes('diy') || pNameLower.includes('gấu') || pNameLower.includes('bình') || 
-                               pNameLower.includes('túi') || pNameLower.includes('móc khóa') || pNameLower.includes('km') || 
-                               pNameLower.includes('khuyến mãi') || pNameLower.includes('voucher');
+            const isGiftName = pNameLower.includes('lồng đèn') || pNameLower.includes('diy') || 
+                               pNameLower.includes('gấu bông') || pNameLower.includes('bình nước') || 
+                               pNameLower.includes('túi vải') || pNameLower.includes('móc khóa') || 
+                               pNameLower.includes('voucher') || pNameLower.includes('vé xem');
 
-            // Price anomaly check: If unit price >= 100.000đ or price > order's finalTotal (e.g. 9.999.999đ dummy price on POS machine)
-            const isPriceAnomaly = price >= 100000 || (finalTotal > 0 && price > finalTotal);
+            // Price anomaly check: Dummy 9.999.999đ promo price on POS machine
+            const isPriceAnomaly = price >= 100000 || (finalTotal > 0 && price > finalTotal && price >= 50000);
 
-            const isGift = isGiftUnit || isGiftName || isPriceAnomaly || (baseFinalPrice === 0 && price > 0);
+            const isNonDrinkMerchandise = isGiftUnit || isGiftName || isPriceAnomaly;
 
-            if (isGift) {
-                // Auto-handle promo item: set price to 0đ, total to 0đ, and DO NOT count as drink cup!
+            if (isNonDrinkMerchandise) {
+                // Non-beverage merchandise gifts: exclude from drink invoice
                 items.push({
                     name: pName,
                     unit: unit,
@@ -1241,7 +1241,7 @@ function compileEasyInvoiceRecords(rawItemsList, dateStr, customNumInvoices = 0,
     }
 
     // Filter out 0đ promotional gift items (Lồng Đèn, Quà tặng, 0đ...) from tax EasyInvoice export
-    let validItemsList = rawItemsList.filter(item => !item.isGift && Number(item.total || 0) > 0);
+    let validItemsList = rawItemsList.filter(item => !item.isGift);
     if (validItemsList.length === 0) return [];
 
     const totalAvailableRevenue = validItemsList.reduce((sum, i) => sum + Number(i.total || 0), 0);
@@ -1797,7 +1797,7 @@ function selectSingleOrder(orderId) {
 
     // Process & group order items for display
     const rawItems = order.items || [];
-    const validItems = rawItems.filter(item => !item.isGift && Number(item.total || 0) > 0);
+    const validItems = rawItems.filter(item => !item.isGift);
     const giftItems = rawItems.filter(item => item.isGift || Number(item.total || 0) === 0);
 
     const groupedMap = new Map();
@@ -1827,18 +1827,21 @@ function selectSingleOrder(orderId) {
         totalAmount += item.total;
 
         let discountBadge = '';
-        if (item.originalPrice && item.originalPrice > item.price) {
+        let freeGiftBadge = '';
+        if (item.price === 0) {
+            freeGiftBadge = `<span style="background: #e0f2fe; color: #0284c7; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-left: 6px;">🎁 Ly tặng (0đ)</span>`;
+        } else if (item.originalPrice && item.originalPrice > item.price) {
             const discPerCup = item.originalPrice - item.price;
             discountBadge = `<span style="font-size: 11px; color: #ef4444; font-weight: 600; display: block;">(-${discPerCup.toLocaleString('vi-VN')}đ VIP)</span>`;
         }
 
         tbodyHtml += `
-            <tr>
+            <tr ${item.price === 0 ? 'style="background: rgba(2, 132, 199, 0.04);"' : ''}>
                 <td style="text-align: center; color: #64748b;">${idx + 1}</td>
-                <td><strong>${escapeHtml(item.name)}</strong></td>
+                <td><strong>${escapeHtml(item.name)}</strong> ${freeGiftBadge}</td>
                 <td style="text-align: center;"><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-size: 11px;">${escapeHtml(item.unit || 'Ly')}</span></td>
                 <td style="text-align: center; font-weight: 700; color: #0284c7;">${item.qty}</td>
-                <td style="text-align: right;">${item.price.toLocaleString('vi-VN')}đ ${discountBadge}</td>
+                <td style="text-align: right; font-weight: ${item.price === 0 ? '700' : 'normal'}; color: ${item.price === 0 ? '#0284c7' : 'inherit'};">${item.price.toLocaleString('vi-VN')}đ ${discountBadge}</td>
                 <td style="text-align: right; font-weight: 700; color: #059669;">${item.total.toLocaleString('vi-VN')}đ</td>
             </tr>
         `;
@@ -1907,7 +1910,7 @@ function exportSingleOrderToEasyInvoice() {
 
         // Process order items
         const rawItems = selectedSingleOrder.items || [];
-        const validItems = rawItems.filter(item => !item.isGift && Number(item.total || 0) > 0);
+        const validItems = rawItems.filter(item => !item.isGift);
 
         if (validItems.length === 0) {
             showToast("Đơn hàng này không có sản phẩm tính phí hợp lệ để xuất hóa đơn!", "error");
