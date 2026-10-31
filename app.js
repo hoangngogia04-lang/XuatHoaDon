@@ -1798,7 +1798,7 @@ function selectSingleOrder(orderId) {
     // Process & group order items for display
     const rawItems = order.items || [];
     const validItems = rawItems.filter(item => !item.isGift);
-    const giftItems = rawItems.filter(item => item.isGift || Number(item.total || 0) === 0);
+    const giftItems = rawItems.filter(item => item.isGift);
 
     const groupedMap = new Map();
     validItems.forEach(item => {
