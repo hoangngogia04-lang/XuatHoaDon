@@ -608,7 +608,7 @@ function parsePosAppOrdersJson(resData, branchName) {
                             ((topNameLower.includes('đường') || topNameLower.includes('đá') || topName.includes('糖') || topName.includes('冰')) && topPrice === 0);
 
                         if (!isZeroSugarIce) {
-                            toppingNames.push(topName);
+                            toppingNames.push(topName + (topQty > 1 ? ` x${topQty}` : ''));
                             toppingTotalPricePerCup += topPrice * topQty;
                             toppingsCount += topQty * qty;
                         }
@@ -638,7 +638,7 @@ function parsePosAppOrdersJson(resData, branchName) {
                 }
 
                 const fullUnitPrice = price + toppingTotalPricePerCup;
-                const finalUnitPrice = baseFinalPrice + toppingTotalPricePerCup;
+                const finalUnitPrice = Math.max(0, fullUnitPrice - discPrice);
                 
                 // Format name matching user reference screenshot (media_1789737235340.png)
                 let sizeNote = '';
